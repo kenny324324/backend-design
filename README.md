@@ -102,7 +102,11 @@ backend-design/
 - ⚠️ **lucide 節點不可被 Vue `v-if` 抽換**(createIcons 會把 `<i>` 換成 SVG,Vue 卸載原節點時會爆掉整個 app)— 深淺色那類切換要兩顆 icon 都先渲染、用 class 切顯示。下拉 caret 這種 JS 動態注入的元素用**內嵌 SVG**(dropdown.js 的做法),不經 lucide。
 
 ### 導覽 / Nav 架構(整套在 base.html + b_admin.css/base.css)
-- 結構:固定 `top-header`(logo/字級/深淺色/手冊/前台/帳號下拉)+ 左側 `sidebar`(選單)+ `main-content`。
+- 結構:固定 `top-header` + 左側 `sidebar`(選單)+ `main-content`。
+- **top-header 上的項目**(markup/樣式/行為全在 base.html + b_admin.css):
+  - 左:漢堡鈕(窄視窗)、logo(`.logo-icon`,無 logo 時 `is-empty` 不佔位)、站名、「後台」小標籤(`.logo-env`)。
+  - 右(`.header-right`,共用 `.header-icon-btn` 樣式):**字級 Aa 鈕**(浮出三段滑桿面板 中/大/特大,`data-fs`+localStorage,**首繪前套用防閃字級**)→ **深淺色切換**(月/日兩顆 icon 先渲染、class 切顯示 — 避開 lucide v-if 坑;`data-color-mode`+localStorage 防閃色)→ 分隔線 `.header-sep` → **操作手冊**、**前往前台**(新分頁)→ **帳號下拉**(頭像+名字+caret,`hdr-user` transition 展開:帳號名/email 抬頭 + 登出 POST form 帶 CSRF)。
+  - 面板類(字級/帳號)都有「點外面自動關」,注意要 `@click.stop`(lucide 重繪坑,見側邊欄一節)。
 - **選單資料來自 API**:`GET /cms/<code>/usermenu`(B)/ A 版同構,回 `{ success, menu: [{ id, title, url, sub: [{ id, title, url }] }] }` — 靜態專案給一份同形狀的 JSON 即可(demo/預覽就是走 `window.__B_PREVIEW_MENU` 注入)。
 - 行為(Vue 殼層已實作):手風琴 **single-open**;active 判斷 `isCurrentMenuItem` / `isGroupActive`;連結由 `menuHref(url)` 組(前綴集中一處,新專案改這個 method 就好);儀表板獨立置頂、登出住右上帳號下拉(側欄不重複放)。
 - **可伸縮側邊欄(收合軌)** — 完整實作都在:
