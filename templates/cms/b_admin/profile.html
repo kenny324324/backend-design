@@ -1,0 +1,23 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}修改密碼{% endblock %}
+{% block page_title %}修改密碼{% endblock %}
+{% block content %}
+<div class="max-w-md rounded border bg-white p-6">
+    <form method="post" action="{{ url_for('cms_b_admin.profile') }}" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <label class="mb-1 block text-sm font-semibold">原密碼</label>
+            <input name="old_password" type="password" required class="w-full border px-3 py-2">
+        </div>
+        <div>
+            <label class="mb-1 block text-sm font-semibold">新密碼(至少 6 碼)</label>
+            <input name="new_password" type="password" required minlength="6" class="w-full border px-3 py-2">
+        </div>
+        <div>
+            <label class="mb-1 block text-sm font-semibold">確認新密碼</label>
+            <input name="confirm_password" type="password" required minlength="6" class="w-full border px-3 py-2">
+        </div>
+        <button class="rounded b-bg px-5 py-2 text-white">更新密碼</button>
+    </form>
+</div>
+{% endblock %}

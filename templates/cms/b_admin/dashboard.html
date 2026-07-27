@@ -1,0 +1,141 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}儀表板{% endblock %}
+{% block page_title %}今日營運{% endblock %}
+{% set status_labels = {'pending':'待確認','confirmed':'已確認','cancelled':'已取消','checked_in':'已報到','no_show':'未到'} %}
+{% set payment_labels = {'unpaid':'未付款','pending':'處理中','paid':'已付款','onsite':'現場付款','failed':'付款失敗'} %}
+{% set done_status = ['confirmed','checked_in'] %}
+{% set neutral_status = ['cancelled','no_show'] %}
+{% set done_payment = ['paid','onsite'] %}
+{% macro stat(v) %}<span class="b-badge {{ 'neutral' if v in neutral_status else ('ok' if v in done_status else 'warn') }}"><span class="dot"></span>{{ status_labels.get(v, v) }}</span>{% endmacro %}
+{% macro pay(v) %}<span class="b-badge {{ 'ok' if v in done_payment else ('bad' if v == 'failed' else 'warn') }}"><span class="dot"></span>{{ payment_labels.get(v, v) }}</span>{% endmacro %}
+{% block content %}
+<div class="b-kpi-grid">
+    <div class="b-kpi">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">今日預約組數</span>
+            <span class="b-kpi-icon"><i data-lucide="calendar-check" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ stats.total or 0 }}</div>
+    </div>
+    <div class="b-kpi">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">待確認</span>
+            <span class="b-kpi-icon"><i data-lucide="clock" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ stats.pending or 0 }}</div>
+    </div>
+    <div class="b-kpi">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">線上已付款</span>
+            <span class="b-kpi-icon"><i data-lucide="credit-card" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ stats.paid or 0 }}</div>
+    </div>
+    <div class="b-kpi">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">現場付款</span>
+            <span class="b-kpi-icon"><i data-lucide="map-pin" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ stats.onsite or 0 }}</div>
+    </div>
+</div>
+
+<div class="b-dash-grid">
+    <!-- 左大欄:最近預約清單 -->
+    <section class="b-card b-dash-main" style="overflow:hidden;">
+        <div class="b-card-head">
+            <h2 class="b-card-title">最近預約</h2>
+            <a href="{{ url_for('cms_b_admin.bookings') }}" class="b-btn b-btn-ghost b-btn-sm">
+                查看全部<i data-lucide="arrow-right" style="margin-left:6px;" aria-hidden="true"></i>
+            </a>
+        </div>
+        {% if today_bookings %}
+        <div class="b-tbl-wrap" style="border:0;border-radius:0;box-shadow:none;">
+            <table class="b-tbl">
+                <thead>
+                    <tr>
+                        <th scope="col">日期</th>
+                        <th scope="col">開球</th>
+                        <th scope="col">球區</th>
+                        <th scope="col">姓名</th>
+                        <th scope="col" class="num">人數</th>
+                        <th scope="col">狀態</th>
+                        <th scope="col">付款</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in today_bookings %}
+                    <tr>
+                        <td class="b-th num">{{ b.play_date }}</td>
+                        <td class="num">{{ b.tee_time.strftime('%H:%M') if b.tee_time and b.tee_time.strftime is defined else (b.tee_time or '—') }}</td>
+                        <td>{{ b.zone_name or '—' }}</td>
+                        <td>{{ b.guest_name }}</td>
+                        <td class="num">{{ b.players }}</td>
+                        <td>{{ stat(b.status) }}</td>
+                        <td>{{ pay(b.payment_status) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="b-empty">
+            <span class="b-empty-icon"><i data-lucide="calendar" aria-hidden="true"></i></span>
+            <p class="b-empty-title">還沒有預約</p>
+            <p class="b-empty-sub">預約進來後會列在這裡,方便你一眼掌握要接的組數。</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- 右窄欄:待辦 / 佔用率 / 快速動作 -->
+    <aside class="b-dash-side">
+        <section class="b-card" style="overflow:hidden;">
+            <div class="b-card-head"><h2 class="b-card-title">今日待辦</h2></div>
+            <div class="b-todo {{ 'is-alert' if todos.pending_pay else 'is-zero' }}">
+                <span class="b-todo-label"><i data-lucide="banknote" aria-hidden="true"></i>待收 / 現場款</span>
+                <span class="b-todo-num">{{ todos.pending_pay }}</span>
+            </div>
+            <div class="b-todo {{ 'is-alert' if todos.overdue_caddie else 'is-zero' }}">
+                <span class="b-todo-label"><i data-lucide="user-round" aria-hidden="true"></i>缺桿弟(已逾時)</span>
+                <span class="b-todo-num">{{ todos.overdue_caddie }}</span>
+            </div>
+            <div class="b-todo {{ 'is-alert' if todos.pending_refund else 'is-zero' }}">
+                <span class="b-todo-label"><i data-lucide="rotate-ccw" aria-hidden="true"></i>待退款</span>
+                <span class="b-todo-num">{{ todos.pending_refund }}</span>
+            </div>
+        </section>
+
+        <section class="b-card" style="overflow:hidden;">
+            <div class="b-card-head"><h2 class="b-card-title">今日球區佔用率</h2></div>
+            {% if zone_occupancy %}
+            <div class="b-occ">
+                {% for z in zone_occupancy %}
+                <div class="b-occ-row">
+                    <div class="b-occ-head">
+                        <span class="b-occ-name">{{ z.zone_name }}</span>
+                        <span class="b-occ-val">{{ z.booked }} / {{ z.cap }}({{ z.pct }}%)</span>
+                    </div>
+                    <div class="b-occ-track">
+                        <div class="b-occ-fill {{ 'is-full' if z.pct >= 90 }}" style="width: {{ z.pct }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="b-empty" style="padding:32px 24px;">
+                <p class="b-empty-sub">今天還沒有開放的時段。</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="b-card" style="overflow:hidden;">
+            <div class="b-card-head"><h2 class="b-card-title">快速動作</h2></div>
+            <div class="b-quick">
+                <a href="{{ url_for('cms_b_admin.slots') }}" class="b-quick-btn"><i data-lucide="calendar-plus" aria-hidden="true"></i><span>時段管理</span></a>
+                <a href="{{ url_for('cms_b_admin.bookings') }}" class="b-quick-btn"><i data-lucide="list-checks" aria-hidden="true"></i><span>預約管理</span></a>
+                <a href="{{ url_for('cms_b_admin.checkin') }}" class="b-quick-btn"><i data-lucide="qr-code" aria-hidden="true"></i><span>報到掃描</span></a>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

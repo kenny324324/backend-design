@@ -1,0 +1,130 @@
+{% extends "cms/base.html" %}
+
+{% block title %}我的資料{% endblock %}
+{% block page_title %}我的資料{% endblock %}
+
+{% block content %}
+<div class="content-card">
+    <!-- 標題 -->
+    <div style="padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+        <h2 class="section-title" style="margin-bottom: 0;">
+            <i class="fa-solid fa-user-pen" style="margin-right: 8px;"></i>
+            編輯個人資料
+        </h2>
+    </div>
+
+    <!-- 表單 -->
+    <form @submit.prevent="submitForm" class="profile-form">
+        <!-- 機關 (唯讀，隱藏但保留功能) -->
+        <div v-show="showStoreField" class="form-row">
+            <label>所屬機關</label>
+            <div>
+                <div class="form-input readonly">[[ userData.storename || '-' ]]</div>
+            </div>
+        </div>
+
+        <!-- 權限群組 (唯讀) -->
+        <div class="form-row">
+            <label>權限群組</label>
+            <div>
+                <div class="form-input readonly">[[ userData.groupname || '-' ]]</div>
+            </div>
+        </div>
+
+        <!-- Email -->
+        <div class="form-row">
+            <label>Email <span class="required">*</span></label>
+            <div>
+                <input type="email"
+                       v-model="userData.email"
+                       autocomplete="email"
+                       aria-label="Email"
+                       placeholder="請輸入 Email"
+                       :class="['form-input', errors.email ? 'error' : '']">
+                <p v-if="errors.email" class="form-error">[[ errors.email ]]</p>
+            </div>
+        </div>
+
+        <!-- 姓名 -->
+        <div class="form-row">
+            <label>姓名 <span class="required">*</span></label>
+            <div>
+                <input type="text"
+                       v-model="userData.name"
+                       autocomplete="name"
+                       aria-label="Name"
+                       placeholder="請輸入姓名"
+                       :class="['form-input', errors.name ? 'error' : '']">
+                <p v-if="errors.name" class="form-error">[[ errors.name ]]</p>
+            </div>
+        </div>
+
+        <!-- 分隔線 - 密碼區塊 -->
+        <div class="section-divider">
+            <h3><i class="fa-solid fa-key"></i>修改密碼 (選填)</h3>
+        </div>
+
+        <!-- 新密碼 -->
+        <div class="form-row">
+            <label>新密碼</label>
+            <div>
+                <div class="password-wrapper">
+                    <input :type="showPassword ? 'text' : 'password'"
+                           v-model="userData.password"
+                           autocomplete="new-password"
+                           aria-label="New password"
+                           placeholder="不修改請留空"
+                           :class="['form-input', errors.password ? 'error' : '']"
+                           style="padding-right: 40px;">
+                    <button type="button"
+                            @click="showPassword = !showPassword"
+                            :aria-pressed="showPassword.toString()"
+                            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                            class="password-toggle">
+                        <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                    </button>
+                </div>
+                <p v-if="errors.password" class="form-error">[[ errors.password ]]</p>
+                <p class="form-hint">密碼至少需要 6 個字元</p>
+            </div>
+        </div>
+
+        <!-- 確認密碼 -->
+        <div class="form-row">
+            <label>確認密碼</label>
+            <div>
+                <div class="password-wrapper">
+                    <input :type="showPasswordConfirm ? 'text' : 'password'"
+                           v-model="userData.password_confirm"
+                           autocomplete="new-password"
+                           aria-label="Confirm new password"
+                           placeholder="請再次輸入新密碼"
+                           :class="['form-input', errors.password_confirm ? 'error' : '']"
+                           style="padding-right: 40px;">
+                    <button type="button"
+                            @click="showPasswordConfirm = !showPasswordConfirm"
+                            :aria-pressed="showPasswordConfirm.toString()"
+                            :aria-label="showPasswordConfirm ? 'Hide password confirmation' : 'Show password confirmation'"
+                            class="password-toggle">
+                        <i :class="showPasswordConfirm ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                    </button>
+                </div>
+                <p v-if="errors.password_confirm" class="form-error">[[ errors.password_confirm ]]</p>
+            </div>
+        </div>
+
+        <!-- 按鈕 -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 1px solid var(--border-color); margin-top: 24px;">
+            <a :href="`${BASE_URL}/cms/index`" class="btn btn-outline">取消</a>
+            <button type="submit"
+                    :disabled="isSubmitting"
+                    class="btn btn-primary">
+                <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                <i v-else class="fa-solid fa-check"></i>
+                儲存變更
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

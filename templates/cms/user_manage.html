@@ -1,0 +1,222 @@
+{% extends "cms/base.html" %}
+
+{% block title %}使用者管理{% endblock %}
+{% block page_title %}使用者管理{% endblock %}
+{# 照球場管理/預約管理/會員管理:固定高框架 → 表格吃視窗剩餘高度、內滾、thead sticky,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 表頭釘住:強制所有 thead th sticky(對齊球場管理/預約管理/會員管理的內滾表頭行為) */
+.b-tbl-scroll table.dataTable > thead > tr > th,
+.b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 狀態:表頭與內容都居中 */
+table.dataTable th.col-center,
+table.dataTable td.col-center { text-align: center; }
+
+.course-scope-list {
+    display: grid;
+    gap: 8px;
+    max-height: 180px;
+    overflow: auto;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    background: var(--neutral-primary-soft);
+}
+
+.course-scope-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-body);
+    font-size: 0.92rem;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.course-scope-option input {
+    width: 16px;
+    height: 16px;
+}
+</style>
+{% endblock %}
+
+{% block page_actions %}
+{# 搜尋框對齊球場管理/預約管理/會員管理(.a-search):驅動 DataTables server-side search[value],300ms 去抖 #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋姓名 / Email / 機關" aria-label="搜尋使用者">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+<button @click="openAddForm" class="b-btn b-btn-primary">
+    <i class="fa-solid fa-plus"></i>
+    新增使用者
+</button>
+{% endblock %}
+
+{% block content %}
+{# 三件套範本:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、內滾、thead sticky #}
+<div class="b-tbl-scroll">
+    <table id="userTable" class="b-tbl" style="width: 100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- 新增/編輯:modal(Vue 驅動;對齊系統 modal:is-soft + b-modal-fade 淡入淡出 + 無取消,寬扁 2 欄) -->
+<transition name="b-modal-fade">
+<div v-show="showForm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="requestClose">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" style="max-width: 760px;">
+            <div class="b-modal-head">
+                <h2 class="b-modal-title">[[ isEdit ? '編輯使用者' : '新增使用者' ]]</h2>
+                <button type="button" class="b-modal-close" @click="requestClose" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form @submit.prevent="submitForm">
+                <div class="b-modal-body">
+                <div class="b-form-grid">
+                <!-- 機關 (隱藏，預設第一筆，可透過 showStoreField 開啟) -->
+                <div v-show="showStoreField" class="form-group">
+                    <label class="form-label">
+                        所屬機關 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <select v-model="formData.store_id"
+                            :class="['form-input', errors.store_id ? 'error' : '']">
+                        <option value="">請選擇機關</option>
+                        <option v-for="store in stores" :key="store.id" :value="store.id">
+                            [[ store.name ]]
+                        </option>
+                    </select>
+                    <p v-if="errors.store_id" class="form-error">[[ errors.store_id ]]</p>
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label class="form-label">
+                        電子郵件 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <input type="email"
+                           v-model="formData.email"
+                           placeholder="請輸入 Email"
+                           :class="['form-input', errors.email ? 'error' : '']">
+                    <p v-if="errors.email" class="form-error">[[ errors.email ]]</p>
+                </div>
+
+                <!-- 姓名 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        姓名 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <input type="text"
+                           v-model="formData.name"
+                           placeholder="請輸入姓名"
+                           :class="['form-input', errors.name ? 'error' : '']">
+                    <p v-if="errors.name" class="form-error">[[ errors.name ]]</p>
+                </div>
+
+                <!-- 密碼 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        密碼
+                        <span v-if="!isEdit" style="color: var(--danger-color);">*</span>
+                        <span v-else style="color: var(--text-body-subtle); font-weight: normal; font-size: 0.85rem; margin-left: 4px;">(不修改請留空)</span>
+                    </label>
+                    <div class="password-wrapper">
+                        <input :type="showPassword ? 'text' : 'password'"
+                               v-model="formData.pswd"
+                               :placeholder="isEdit ? '不修改請留空' : '請輸入密碼（至少6個字元）'"
+                               :class="['form-input', errors.pswd ? 'error' : '']"
+                               style="padding-right: 40px;">
+                        <button type="button"
+                                @click="showPassword = !showPassword"
+                                :aria-pressed="showPassword.toString()"
+                                :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                                class="password-toggle">
+                            <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                        </button>
+                    </div>
+                    <p v-if="errors.pswd" class="form-error">[[ errors.pswd ]]</p>
+                    <p v-if="isEdit" class="form-hint">如需修改密碼，請輸入新密碼（至少6個字元）</p>
+                </div>
+
+                <!-- 權限群組 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        權限群組 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <select v-model="formData.group_id"
+                            :class="['form-input', errors.group_id ? 'error' : '']">
+                        <option value="">請選擇群組</option>
+                        <option v-for="group in groups" :key="group.id" :value="group.id">
+                            [[ group.name ]]
+                        </option>
+                    </select>
+                    <p v-if="errors.group_id" class="form-error">[[ errors.group_id ]]</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">帳號狀態</label>
+                    <select v-model="formData.disable" class="form-input">
+                        <option value="0">啟用</option>
+                        <option value="1">停用</option>
+                    </select>
+                </div>
+
+                <!-- 管理場域(整列橫跨兩欄) -->
+                <div class="form-group col-span-2">
+                    <label class="form-label">&#31649;&#29702;&#22580;&#22495;</label>
+                    <div class="course-scope-list">
+                        <label v-for="course in courses" :key="course.id" class="course-scope-option">
+                            <input type="checkbox" :value="course.id" v-model="formData.course_ids">
+                            <span>[[ course.name ]]</span>
+                        </label>
+                    </div>
+                    <p class="form-hint">&#26410;&#36984;&#25799;&#20195;&#34920;&#21487;&#31649;&#29702;&#20840;&#37096;&#22580;&#22495;&#65307;&#26377;&#36984;&#25799;&#26178;&#65292;&#26283;&#20572;&#29151;&#26989;&#31649;&#29702;&#26371;&#38480;&#21046;&#22312;&#25351;&#23450;&#22580;&#22495;&#12290;</p>
+                </div>
+
+                </div><!-- /b-form-grid -->
+                </div>
+                <div class="b-modal-foot">
+                    <button type="submit" :disabled="isSubmitting || formIncomplete" class="b-btn b-btn-text">
+                        <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                        <span>[[ isEdit ? '儲存變更' : '確認新增' ]]</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</transition>
+
+<!-- 關閉確認:有輸入/修改才跳(對齊球場管理的 .b-modal.is-alert)-->
+<transition name="b-modal-fade">
+<div v-show="showCloseConfirm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="cancelClose">
+    <div class="b-modal is-alert" role="alertdialog" aria-modal="true">
+        <div class="b-alert-body">
+            <div class="b-alert-icon b-alert-icon-danger" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 class="b-alert-title">要放棄這次編輯嗎?</h2>
+            <p class="b-alert-desc">你[[ isEdit ? '的修改' : '輸入的資料' ]]尚未儲存,現在關閉不會保留。</p>
+        </div>
+        <div class="b-alert-foot">
+            <button type="button" class="b-btn b-btn-quiet" @click="cancelClose">繼續編輯</button>
+            <button type="button" class="b-btn b-btn-text b-btn-text-danger" @click="confirmClose">放棄並關閉</button>
+        </div>
+    </div>
+</div>
+</transition>
+{% endblock %}
+

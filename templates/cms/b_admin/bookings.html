@@ -1,0 +1,122 @@
+{% extends "cms/b_admin/base.html" %}
+{% import "cms/b_admin/_components.html" as ui with context %}
+{% block title %}預約管理{% endblock %}
+{% block page_title %}預約管理{% endblock %}
+{% block main_modifier %}is-fixed-h{% endblock %}
+{% set status_labels = {'pending':'待確認','confirmed':'已確認','cancelled':'已取消','checked_in':'已報到','no_show':'未到'} %}
+{% set payment_labels = {'unpaid':'未付款','paid':'已付款','onsite':'現場付款','failed':'付款失敗'} %}
+{# 綠=完成/正常,紅=未完成/需處理,灰=中性(已取消) #}
+{% set done_status = ['confirmed','checked_in'] %}
+{% set neutral_status = ['cancelled'] %}
+{% set done_payment = ['paid'] %}
+{% macro stat(v) %}<span class="b-badge {{ 'neutral' if v in neutral_status else ('ok' if v in done_status else 'warn') }}"><span class="dot"></span>{{ status_labels.get(v, v) }}</span>{% endmacro %}
+{% macro pay(v) %}<span class="b-badge {{ 'ok' if v in done_payment else ('bad' if v == 'failed' else 'warn') }}"><span class="dot"></span>{{ payment_labels.get(v, v) }}</span>{% endmacro %}
+
+{% block page_actions %}
+{# 篩選:右上「篩選」鈕向下展開下拉面板,GET 送出(URL query),不改後端行為 #}
+{% call ui.filter_panel(action=url_for('cms_b_admin.bookings'), active=request.args) %}
+    <label class="b-label">日期
+        <input type="date" name="date" value="{{ f_date }}" class="b-input">
+    </label>
+    <label class="b-label">狀態
+        <select name="status" class="b-select">
+            <option value="">全部狀態</option>
+            {% for s in ['pending','confirmed','cancelled','checked_in','no_show'] %}<option value="{{ s }}" {{ 'selected' if f_status==s }}>{{ status_labels[s] }}</option>{% endfor %}
+        </select>
+    </label>
+    <label class="b-label">付款
+        <select name="payment" class="b-select">
+            <option value="">全部付款</option>
+            {% for p in ['unpaid','paid','onsite','failed'] %}<option value="{{ p }}" {{ 'selected' if f_payment==p }}>{{ payment_labels[p] }}</option>{% endfor %}
+        </select>
+    </label>
+    <label class="b-label">關鍵字
+        <input type="text" name="q" value="{{ keyword }}" placeholder="姓名 / 手機 / 編號" class="b-input">
+    </label>
+{% endcall %}
+{% endblock %}
+
+{% block content %}
+
+{# 預約寬表(內滾:吃視窗剩餘高度、thead 釘住,跟桿弟管理一致) #}
+{% set booking_headers = ["編號", "日期", "開球", "球區", "姓名", "手機", "人數", "金額", "狀態/付款", "操作"] %}
+{% call ui.table(booking_headers) %}
+    {% for b in bookings %}
+    <tr class="border-t {{ 'bg-red-50' if b.overdue_caddie_alert }}">
+        <td class="px-3 py-2 font-semibold">
+            {{ b.code }}
+            {% if b.overdue_caddie_alert %}
+            <div class="mt-1 b-alert-pill">需立即指派桿弟</div>
+            {% endif %}
+        </td>
+        <td class="px-3 py-2">{{ b.play_date }}</td>
+        <td class="px-3 py-2">{{ b.tee_time }}</td>
+        <td class="px-3 py-2">{{ b.zone_name }}</td>
+        <td class="px-3 py-2">{{ b.guest_name }}</td>
+        <td class="px-3 py-2">{{ b.guest_phone }}</td>
+        <td class="px-3 py-2">{{ b.players }}</td>
+        <td class="px-3 py-2 whitespace-nowrap font-semibold num">NT$ {{ "{:,.0f}".format(b.total_price or 0) }}</td>
+        <td class="px-3 py-2 whitespace-nowrap"><div class="b-status-stack">{{ stat(b.status) }} {{ pay(b.payment_status) }}</div></td>
+        <td class="px-3 py-2">
+            <button type="button" class="b-btn b-btn-ghost b-btn-icon" data-modal-open="bk-edit-{{ b.id }}" title="編輯" aria-label="編輯預約 {{ b.code }}">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+            </button>
+        </td>
+    </tr>
+    {% else %}
+        {{ ui.empty_row(10, "沒有符合條件的預約。") }}
+    {% endfor %}
+{% endcall %}
+
+{# 每筆預約一個編輯彈窗:人數/狀態/付款搬進寬鬆的 modal,操作欄只留「編輯」鈕。
+   form 保留 b-bk-form + data-payment/data-total + 原 action,送出邏輯(現場收款提示)不變;
+   狀態/付款維持「空 = 不改這欄」語意(後端只在值合法時才寫入),不預選當前值以免誤改寫。 #}
+{% for b in bookings %}
+<div class="b-modal-overlay" id="bk-edit-{{ b.id }}" role="dialog" aria-modal="true" aria-labelledby="bk-edit-{{ b.id }}-title">
+    <div class="b-modal is-soft is-wide">
+        <div class="b-modal-head">
+            <h2 class="b-modal-title" id="bk-edit-{{ b.id }}-title">編輯預約 {{ b.code }}</h2>
+            <button type="button" class="b-modal-close" data-modal-close aria-label="關閉"><i data-lucide="x" aria-hidden="true"></i></button>
+        </div>
+        <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.update_booking', booking_id=b.id, date=f_date) }}"
+              class="b-bk-form" data-payment="{{ b.payment_status }}" data-total="{{ '%.0f'|format(b.total_price or 0) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="b-modal-body grid grid-cols-1 gap-3">
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
+                    <div><span class="text-gray-400">日期</span> {{ b.play_date }} {{ b.tee_time }}</div>
+                    <div><span class="text-gray-400">球區</span> {{ b.zone_name }}</div>
+                    <div><span class="text-gray-400">姓名</span> {{ b.guest_name }}</div>
+                    <div><span class="text-gray-400">金額</span> <span class="font-semibold num">NT$ {{ "{:,.0f}".format(b.total_price or 0) }}</span></div>
+                </div>
+                <label class="b-label">人數
+                    <select name="players" class="b-select">
+                        {% for n in [1,2,3,4] %}<option value="{{ n }}" {{ 'selected' if b.players==n }}>{{ n }} 人</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="b-label">狀態 <span class="text-gray-400">(目前:{{ status_labels.get(b.status, b.status) }})</span>
+                    <select name="status" class="b-select">
+                        <option value="">不變更</option>
+                        {% for s in ['pending','confirmed','cancelled','checked_in','no_show'] %}<option value="{{ s }}">{{ status_labels[s] }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="b-label">付款 <span class="text-gray-400">(目前:{{ payment_labels.get(b.payment_status, b.payment_status) }})</span>
+                    <select name="payment_status" class="b-select">
+                        <option value="">不變更</option>
+                        {% for p in ['unpaid','paid','onsite','failed'] %}<option value="{{ p }}">{{ payment_labels[p] }}</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="b-modal-foot">
+                <button class="b-btn b-btn-text">更新</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block extra_js %}
+{# SPA:頁專屬 JS(admin-bookings/slots/theme/checkin)與 billing 全部在 base.html 殼層只載一次,
+   各自註冊 window.pageInit.<name>;spa.js 換頁時呼叫對應 init。此頁 extra_js 留空。 #}
+{% endblock %}

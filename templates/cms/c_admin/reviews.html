@@ -1,0 +1,58 @@
+{% extends "cms/b_admin/base.html" %}
+{% import "cms/b_admin/_components.html" as ui with context %}
+{% block title %}評鑑紀錄{% endblock %}
+{% block page_title %}評鑑紀錄{% endblock %}
+{% set st_labels = {'normal':'正常','low_score':'低分'} %}
+{% set wr_labels = {'yes':'願意','no':'不願意','unsure':'不確定'} %}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block page_actions %}
+{# 篩選:右上「篩選」鈕向下展開下拉面板,GET 送出(URL query),不改後端行為 #}
+{% call ui.filter_panel(action=url_for('cms_c_admin.reviews'), active=request.args) %}
+    <label class="b-label">桿弟
+        <select name="caddie_id" class="b-select">
+            <option value="">全部桿弟</option>
+            {% for c in caddies %}<option value="{{ c.id }}" {{ 'selected' if f_caddie==c.id|string }}>{{ c.name }}</option>{% endfor %}
+        </select>
+    </label>
+    <label class="b-label">狀態
+        <select name="status" class="b-select">
+            <option value="">全部狀態</option>
+            {% for k, v in st_labels.items() %}<option value="{{ k }}" {{ 'selected' if f_status==k }}>{{ v }}</option>{% endfor %}
+        </select>
+    </label>
+{% endcall %}
+{% endblock %}
+
+{% block content %}
+
+{# 評鑑寬表(內滾:橫向+縱向皆滾、thead 釘住) #}
+{% set review_headers = ["日期", "訂單", "桿弟", "評鑑人", "態度", "專業", "節奏", "安全", "裝備", "整體", "加權", "再指派", "評語", "狀態"] %}
+{% call ui.table(review_headers) %}
+    {% for r in reviews %}
+    <tr class="border-t align-top">
+        <td class="whitespace-nowrap px-3 py-2">{{ r.play_date }}<div class="text-xs text-gray-400">{{ r.tee_time or '' }}</div></td>
+        <td class="whitespace-nowrap px-3 py-2 font-mono text-xs">{{ r.booking_code or '—' }}</td>
+        <td class="whitespace-nowrap px-3 py-2 font-semibold">{{ r.caddie_name }}</td>
+        <td class="whitespace-nowrap px-3 py-2">{{ r.reviewer_name or '匿名' }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.attitude_score }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.professional_score }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.pace_score }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.safety_score }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.equipment_score }}</td>
+        <td class="whitespace-nowrap px-3 py-2 text-center font-semibold">{{ r.overall_score }}</td>
+        <td class="px-3 py-2 font-bold {{ 'text-red-600' if r.weighted_score and r.weighted_score < 3 else 'text-green-600' }}">
+            {{ '%.2f'|format(r.weighted_score) if r.weighted_score is not none else '—' }}
+        </td>
+        <td class="whitespace-nowrap px-3 py-2 {{ 'text-red-600' if r.willing_reassign=='no' }}">{{ wr_labels.get(r.willing_reassign, '—') }}</td>
+        <td class="px-3 py-2 max-w-[260px]">{{ r.comment or '—' }}</td>
+        {% set display_status = 'low_score' if r.weighted_score is not none and r.weighted_score < 3 else 'normal' %}
+        <td class="whitespace-nowrap px-3 py-2">
+            {{ ui.badge(st_labels.get(display_status, display_status), 'bad' if display_status == 'low_score' else 'neutral') }}
+        </td>
+    </tr>
+    {% else %}
+        {{ ui.empty_row(14, "尚無評鑑紀錄。") }}
+    {% endfor %}
+{% endcall %}
+{% endblock %}

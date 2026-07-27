@@ -1,0 +1,174 @@
+{% extends "cms/base.html" %}
+
+{% block title %}後台首頁{% endblock %}
+{% block page_title %}營運總覽{% endblock %}
+{% block main_modifier %}is-index-fill{% endblock %}
+
+{% block content %}
+<div v-cloak class="a-index-body">
+    <!-- 載入中 -->
+    <div v-if="!dash.loaded" class="b-empty" style="padding: 64px 0;">
+        <p class="b-empty-sub">載入營運資料中…</p>
+    </div>
+
+    <!-- 營運儀表板(bento) -->
+    <div v-else-if="dash.allowed && !dash.error" class="a-bento">
+        <div class="b-kpi a-bento-kpi">
+            <div class="b-kpi-head">
+                <span class="b-kpi-label">今日預約組數</span>
+                <span class="b-kpi-icon"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+            </div>
+            <div class="b-kpi-value num">[[ kpi(statsToday, 'total_bookings') ]]</div>
+        </div>
+        <div class="b-kpi a-bento-kpi">
+            <div class="b-kpi-head">
+                <span class="b-kpi-label">今日預約時數</span>
+                <span class="b-kpi-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span>
+            </div>
+            <div class="b-kpi-value num">[[ formatHours(statsToday && statsToday.total_duration_hours) ]]</div>
+        </div>
+        <div class="b-kpi a-bento-kpi">
+            <div class="b-kpi-head">
+                <span class="b-kpi-label">今日預約金額</span>
+                <span class="b-kpi-icon"><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i></span>
+            </div>
+            <div class="b-kpi-value num">[[ formatCurrency(statsToday && statsToday.total_amount) ]]</div>
+        </div>
+        <div class="b-kpi a-bento-kpi">
+            <div class="b-kpi-head">
+                <span class="b-kpi-label">本月預約組數</span>
+                <span class="b-kpi-icon"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></span>
+            </div>
+            <div class="b-kpi-value num">[[ kpi(statsMonth, 'total_bookings') ]]</div>
+        </div>
+
+        <!-- 大磚:今日預約清單 -->
+        <section class="b-card a-bento-main">
+            <div class="b-card-head">
+                <h2 class="b-card-title">今日預約</h2>
+                <a :href="`${BASE_URL}/cms/booking_manage?start_date=${today}&end_date=${today}`" class="b-btn b-btn-ghost b-btn-sm">
+                    查看全部<i class="fa-solid fa-arrow-right" style="margin-left: 6px;" aria-hidden="true"></i>
+                </a>
+            </div>
+            <div v-if="todayBookings.length" class="b-tbl-wrap" style="border: 0; border-radius: 0; box-shadow: none;">
+                <table class="b-tbl">
+                    <thead>
+                        <tr>
+                            <th scope="col">時間</th>
+                            <th scope="col">球場</th>
+                            <th scope="col">會員</th>
+                            <th scope="col" class="num">時數</th>
+                            <th scope="col" class="num">金額</th>
+                            <th scope="col">狀態</th>
+                            <th scope="col">付款</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="b in todayBookings" :key="b.id">
+                            <td class="b-th num">[[ formatTime(b.start_time) ]]–[[ formatTime(b.end_time) ]]</td>
+                            <td>[[ b.course_name || '—' ]]</td>
+                            <td>[[ b.member_name || '—' ]]</td>
+                            <td class="num">[[ formatHours(b.duration_hours) ]]</td>
+                            <td class="num">[[ formatCurrency(b.total_price) ]]</td>
+                            <td><span class="b-badge" :class="statusClass(b.status)">[[ statusLabel(b.status) ]]</span></td>
+                            <td><span class="b-badge" :class="payClass(b.payment_status)">[[ payLabel(b.payment_status) ]]</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div v-else class="b-empty" style="flex: 1;">
+                <span class="b-empty-icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>
+                <p class="b-empty-title">今天還沒有預約</p>
+                <p class="b-empty-sub">預約進來後會列在這裡,依開始時間排序。</p>
+            </div>
+        </section>
+
+        <!-- 側磚:待辦事項 -->
+        <section class="b-card a-bento-side">
+            <div class="b-card-head"><h2 class="b-card-title">待辦事項</h2></div>
+            <a class="b-todo" :class="kpi(statsAll, 'pending_count') ? 'is-alert' : 'is-zero'"
+               :href="`${BASE_URL}/cms/booking_manage?status=pending`">
+                <span class="b-todo-label"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>待確認預約</span>
+                <span class="b-todo-num">[[ kpi(statsAll, 'pending_count') ]]</span>
+            </a>
+            <a class="b-todo" :class="kpi(statsAll, 'pending_cancel_count') ? 'is-alert' : 'is-zero'"
+               :href="`${BASE_URL}/cms/booking_manage?status=pending_cancel`">
+                <span class="b-todo-label"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i>待取消 / 退款</span>
+                <span class="b-todo-num">[[ kpi(statsAll, 'pending_cancel_count') ]]</span>
+            </a>
+            <a class="b-todo" :class="todayUnpaid ? 'is-alert' : 'is-zero'"
+               :href="`${BASE_URL}/cms/booking_manage?start_date=${today}&end_date=${today}&payment_status=unpaid`">
+                <span class="b-todo-label"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>今日未付款</span>
+                <span class="b-todo-num">[[ todayUnpaid ]]</span>
+            </a>
+        </section>
+
+        <!-- 側磚:未來 3 天預約分布 -->
+        <section class="b-card a-bento-side">
+            <div class="b-card-head"><h2 class="b-card-title">未來 3 天預約</h2></div>
+            <div class="b-occ">
+                <a v-for="d in weekAhead" :key="d.date" class="a-week-row" :class="{ 'is-today': d.isToday }"
+                   :href="`${BASE_URL}/cms/booking_manage?start_date=${d.date}&end_date=${d.date}`">
+                    <div class="b-occ-head">
+                        <span class="b-occ-name">[[ d.label ]]</span>
+                        <span class="b-occ-val">[[ d.count ]] 組<template v-if="d.hours"> · [[ formatHours(d.hours) ]] 小時</template></span>
+                    </div>
+                    <div class="b-occ-track">
+                        <div class="b-occ-fill" :style="{ width: d.pct + '%' }"></div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- 側磚:快速動作 -->
+        <section class="b-card a-bento-side is-quick">
+            <div class="b-card-head"><h2 class="b-card-title">快速動作</h2></div>
+            <div class="b-quick">
+                <a :href="`${BASE_URL}/cms/course_manage`" class="b-quick-btn"><i class="fa-solid fa-flag" aria-hidden="true"></i><span>球場管理</span></a>
+                <a :href="`${BASE_URL}/cms/booking_manage`" class="b-quick-btn"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i><span>預約管理</span></a>
+                <a :href="`${BASE_URL}/cms/email_log_manage`" class="b-quick-btn"><i class="fa-solid fa-envelope-circle-check" aria-hidden="true"></i><span>Email 紀錄</span></a>
+                <a :href="`${BASE_URL}/courses`" target="_blank" rel="noopener" class="b-quick-btn"><i class="fa-solid fa-earth-asia" aria-hidden="true"></i><span>前台球場頁</span></a>
+            </div>
+        </section>
+    </div>
+
+    <!-- 無預約權限 / 載入失敗:退回歡迎卡 + 捷徑 -->
+    <div v-else>
+        <div v-if="dash.error" class="b-alert danger" style="margin-bottom: 24px;">
+            <div>
+                <p class="b-alert-title">載入營運資料失敗</p>
+                <p>[[ dash.error ]]</p>
+                <button type="button" class="b-btn b-btn-sm" style="margin-top: 10px;" @click="loadDashboard">重試</button>
+            </div>
+        </div>
+        <div class="content-card" style="max-width: 980px; padding: 40px;">
+            <div class="b-ish b-ish-circle b-ish-xl brand" style="margin-bottom: 22px;">
+                <i class="fa-solid fa-golf-ball-tee"></i>
+            </div>
+            <h2 style="font-size: 22px; font-weight: var(--b-font-title, 500); color: var(--text-heading); margin-bottom: 10px;">高爾夫球場管理系統</h2>
+            <p style="color: var(--text-body); line-height: 1.7; margin-bottom: 24px; max-width: 560px;">
+                歡迎回來，{{ session.get('cms_username', '管理者') }}。請從左側選單或以下捷徑開始工作。
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+                <a :href="`${BASE_URL}/cms/course_manage`" class="shortcut-card">
+                    <i class="fa-solid fa-flag"></i>
+                    <span>球場管理</span>
+                </a>
+                <a :href="`${BASE_URL}/cms/booking_manage`" class="shortcut-card">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>預約管理</span>
+                </a>
+                <a :href="`${BASE_URL}/cms/email_log_manage`" class="shortcut-card">
+                    <i class="fa-solid fa-envelope-circle-check"></i>
+                    <span>Email 寄送紀錄</span>
+                </a>
+                <a :href="`${BASE_URL}/courses`" target="_blank" rel="noopener" class="shortcut-card">
+                    <i class="fa-solid fa-earth-asia"></i>
+                    <span>查看前台球場頁</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

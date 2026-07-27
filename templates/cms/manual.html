@@ -1,0 +1,128 @@
+{% extends "cms/base.html" %}
+
+{% block title %}操作手冊{% endblock %}
+{% block page_title %}平台後台操作手冊{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">以圖文步驟說明如何維護球場、預約、會員、權限與內容。</p>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .man-wrap { max-width: 1080px; margin: 0 auto; }
+    .man-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 22px; }
+    .man-card { display: block; background: var(--neutral-primary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 18px; text-decoration: none; color: var(--text-heading); box-shadow: var(--shadow-xs); transition: border-color .15s, background .15s, box-shadow .15s; }
+    .man-card:hover { border-color: var(--border-brand-subtle); background: var(--brand-softer); box-shadow: var(--shadow-sm); }
+    .man-card i { color: var(--fg-brand); font-size: 1.4rem; }
+    .man-card h2 { margin: 10px 0 0; font-size: 1rem; font-weight: 500; }
+    .man-sec { background: var(--neutral-primary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-xs); margin-bottom: 18px; overflow: hidden; }
+    .man-sec-head { display: flex; align-items: center; gap: 10px; margin: 0; padding: 16px 22px; border-bottom: 1px solid var(--border-default); color: var(--text-heading); font-size: 1.15rem; font-weight: 500; }
+    .man-num { display: inline-flex; height: 30px; width: 30px; flex: none; align-items: center; justify-content: center; border-radius: var(--radius-full); background: var(--brand); color: var(--b-on-primary, #fff); font-size: .85rem; }
+    .man-body { display: grid; gap: 22px; padding: 22px; }
+    @media (min-width: 820px) { .man-body { grid-template-columns: 1fr 1fr; align-items: start; } }
+    .man-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+    .man-step { display: flex; gap: 12px; font-size: .9rem; line-height: 1.8; color: var(--text-body); }
+    .man-step b { color: var(--text-heading); }
+    .man-dot { margin-top: 3px; display: inline-flex; height: 22px; width: 22px; flex: none; align-items: center; justify-content: center; border-radius: var(--radius-full); background: var(--brand-softer); color: var(--fg-brand); font-size: .72rem; font-weight: 500; }
+    .shot { overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--neutral-primary-soft); box-shadow: var(--shadow-sm); }
+    .shot + .shot { margin-top: 18px; }
+    .shot-bar { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border-default); background: var(--neutral-secondary-soft); padding: 8px 12px; }
+    .shot-bar span.d { height: 9px; width: 9px; border-radius: var(--radius-full); }
+    .shot-bar .t { margin-left: 6px; font-size: .72rem; color: var(--text-body-subtle); }
+    .shot img { display: block; width: 100%; }
+    .shot-cap { border-top: 1px solid var(--border-default); padding: 8px 14px; text-align: center; font-size: .75rem; line-height: 1.6; color: var(--text-body-subtle); }
+    .man-note { font-size: .8rem; color: var(--text-body-subtle); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% macro shot(path, caption, note='') %}
+<figure class="shot">
+    <div class="shot-bar"><span class="d" style="background:#ef6f6c"></span><span class="d" style="background:#f5c451"></span><span class="d" style="background:#5fb37a"></span><span class="t">實際後台畫面</span></div>
+    <img src="{{ url_for('static', filename=path) }}" alt="{{ caption }}" loading="lazy">
+    <figcaption class="shot-cap">{{ caption }}{% if note %}<div class="man-note">{{ note }}</div>{% endif %}</figcaption>
+</figure>
+{% endmacro %}
+
+{% macro step(n, html) %}
+<li class="man-step"><span class="man-dot">{{ n }}</span><span>{{ html|safe }}</span></li>
+{% endmacro %}
+
+{% block content %}
+<div class="man-wrap">
+
+    <div class="man-cards">
+        <a class="man-card" href="#course"><i class="fa-solid fa-golf-ball-tee"></i><h2>① 球場管理</h2></a>
+        <a class="man-card" href="#booking"><i class="fa-solid fa-calendar-check"></i><h2>② 預約與會員</h2></a>
+        <a class="man-card" href="#permission"><i class="fa-solid fa-users-gear"></i><h2>③ 權限管理</h2></a>
+        <a class="man-card" href="#content"><i class="fa-solid fa-envelope-open-text"></i><h2>④ 內容與通知</h2></a>
+    </div>
+
+    <!-- ① 球場管理 -->
+    <section id="course" class="man-sec">
+        <h2 class="man-sec-head"><span class="man-num">1</span>球場管理</h2>
+        <div class="man-body">
+            <ol class="man-steps">
+                {{ step(1, '進入 <b>「球場管理」</b>,清單會列出所有球場的 <b>洞數、平日/假日每小時價格、是否可預約、現場付款</b> 與排序。') }}
+                {{ step(2, '點 <b>「＋新增球場」</b> 或某列的 <b>「編輯」</b>,設定 <b>名稱、介紹、價格、地點、圖片</b> 與是否開放預約。') }}
+                {{ step(3, '某列的 <b>「預約狀況」</b> 可查看該球場的預約情形;<b>「停用」</b> 則為軟刪除(不會真的刪資料)。') }}
+                {{ step(4, '到 <b>「不可預約管理」</b> 用月曆設定 <b>封場、休息日或特殊停用時段</b>,前台就不會開放那些時段。') }}
+                {{ step(5, '修改後到前台球場頁確認顯示是否正確。') }}
+            </ol>
+            <div>
+                {{ shot('manual/cms_courses.png', '球場管理:球場清單與價格、開放狀態') }}
+                {{ shot('manual/cms_blackout.png', '不可預約管理:用月曆設定封場/休息時段') }}
+            </div>
+        </div>
+    </section>
+
+    <!-- ② 預約與會員 -->
+    <section id="booking" class="man-sec">
+        <h2 class="man-sec-head"><span class="man-num">2</span>預約管理與會員</h2>
+        <div class="man-body">
+            <ol class="man-steps">
+                {{ step(1, '<b>「預約管理」</b> 上方可用 <b>日期、狀態、付款狀態或關鍵字</b> 篩選,並看到 <b>預約組數、金額、時數</b> 等統計。') }}
+                {{ step(2, '點任一筆訂單可 <b>更新預約狀態、付款狀態</b> 或 <b>補寄通知信</b>。') }}
+                {{ step(3, '現場報到時,可掃描客人的 <b>QR Code</b> 或輸入預約資訊核對。') }}
+                {{ step(4, '退款或付款完成後,記得同步確認 <b>訂單紀錄與通知結果</b>。') }}
+                {{ step(5, '<b>「會員管理」</b> 可查詢會員資料與其預約紀錄(下圖示意資料已模糊處理)。') }}
+            </ol>
+            <div>
+                {{ shot('manual/cms_bookings.png', '預約管理:篩選、統計與訂單列表', '※ 為保護個資,列表資料已模糊') }}
+                {{ shot('manual/cms_members.png', '會員管理:會員清單與預約紀錄', '※ 為保護個資,列表資料已模糊') }}
+            </div>
+        </div>
+    </section>
+
+    <!-- ③ 權限管理 -->
+    <section id="permission" class="man-sec">
+        <h2 class="man-sec-head"><span class="man-num">3</span>使用者、群組與選單</h2>
+        <div class="man-body">
+            <ol class="man-steps">
+                {{ step(1, '先在 <b>「群組管理」</b> 建立群組,設定該群組可看到哪些選單與可操作的功能。') }}
+                {{ step(2, '再到 <b>「使用者管理」</b> 新增帳號,並把使用者 <b>加入對應群組</b>;群組權限會決定他登入後看到的左側選單。') }}
+                {{ step(3, '停用帳號前,請先確認該帳號是否仍有待處理作業。') }}
+                {{ step(4, '<b>「選單管理」</b> 新增選單後,請檢查 <b>排序、連結與群組授權</b> 是否正確。') }}
+            </ol>
+            <div>
+                {{ shot('manual/cms_users.png', '使用者管理:帳號清單與群組指派', '※ 為保護個資,列表資料已模糊') }}
+                {{ shot('manual/cms_groups.png', '群組管理:設定群組與權限') }}
+                {{ shot('manual/cms_menu.png', '選單管理:選單排序與授權') }}
+            </div>
+        </div>
+    </section>
+
+    <!-- ④ 內容與通知 -->
+    <section id="content" class="man-sec">
+        <h2 class="man-sec-head"><span class="man-num">4</span>內容與通知</h2>
+        <div class="man-body">
+            <ol class="man-steps">
+                {{ step(1, '<b>「內容管理」</b> 可維護一般頁面、公告或前台文案。') }}
+                {{ step(2, '<b>「Email 紀錄」</b> 可查詢通知信是否成功寄出、寄送時間與狀態。') }}
+                {{ step(3, '若客戶反映沒收到信,先到 <b>「Email 紀錄」</b> 確認寄送狀態與會員信箱是否正確。') }}
+            </ol>
+            <div>
+                {{ shot('manual/cms_content.png', '內容管理:頁面與公告維護') }}
+                {{ shot('manual/cms_email.png', 'Email 紀錄:查詢通知信寄送狀態', '※ 為保護個資,列表資料已模糊') }}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

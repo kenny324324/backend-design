@@ -1,0 +1,271 @@
+{% extends "cms/base.html" %}
+
+{% block title %}預約管理{% endblock %}
+{% block page_title %}預約管理{% endblock %}
+{# 照球場管理(course_manage):固定高框架 → 表格吃視窗剩餘高度、內滾、thead sticky,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 精簡統計條:一排 inline chip 取代 7 張大卡,金額不再占大塊空間 */
+.booking-stat-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    padding: 12px 18px;
+    margin-bottom: 14px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xs);
+}
+.booking-stat { display: inline-flex; align-items: baseline; gap: 8px; }
+.booking-stat-label { color: var(--text-body-subtle); font-size: 13px; font-weight: 500; }
+.booking-stat-value {
+    color: var(--text-heading);
+    font-size: 20px;
+    font-weight: var(--b-font-metric, 600);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+.booking-stat-sep { width: 1px; align-self: stretch; min-height: 20px; background: var(--border-default); margin: 0 2px; }
+
+/* 表頭釘住:強制所有 thead th sticky(用 !important 壓過任何 DataTables 內部/inline 干擾,
+   確保每一欄的表頭都釘住,不只操作欄)。對齊球場管理的內滾表頭行為。 */
+.b-tbl-scroll table.dataTable > thead > tr > th,
+.b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+
+/* ── 操作欄 RWD:寬螢幕平鋪 / 窄螢幕收成「操作 ▾」下拉(搬自球場管理)── */
+.col-actions-flat { display: inline-flex; gap: 2px; flex-wrap: nowrap; justify-content: flex-end; }
+.b-actions-dd { display: none; position: relative; }
+.b-actions-dd-trigger {
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 6px; border: 0; background: none;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-body-subtle); white-space: nowrap;
+    transition: color .15s;
+}
+.b-actions-dd-trigger:hover,
+.b-actions-dd.is-open .b-actions-dd-trigger { color: var(--brand); }
+.b-actions-dd-trigger .fa-chevron-down { font-size: 10px; transition: transform .2s; }
+.b-actions-dd.is-open .b-actions-dd-trigger .fa-chevron-down { transform: rotate(180deg); }
+.b-actions-dd-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 1200;
+    min-width: 160px; padding: 4px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    transform-origin: top right;
+    opacity: 0; visibility: hidden; transform: translateY(-6px);
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+.b-actions-dd.is-open .b-actions-dd-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+.b-actions-dd-menu .action-btn {
+    display: flex; align-items: center; gap: 8px;
+    justify-content: flex-start; width: 100%;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+.b-actions-dd-menu .action-btn i { width: 16px; text-align: center; }
+/* 操作:表頭靠左、內容按鈕靠右(col-actions-flat justify-content:flex-end) */
+table.dataTable th.col-actions { text-align: left; }
+/* 付款狀態 / 預約狀態:表頭與內容都居中 */
+table.dataTable th.col-center,
+table.dataTable td.col-center { text-align: center; }
+@media (max-width: 1100px) {
+    .col-actions-flat { display: none; }
+    .b-actions-dd { display: inline-block; }
+}
+
+/* 詳細 modal:分區資訊 */
+.bd-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin: 18px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-default);
+}
+.bd-section-title:first-child { margin-top: 0; }
+.bd-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+}
+.bd-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bd-label { font-size: 12px; color: var(--text-body-subtle); }
+.bd-value { font-size: 14px; color: var(--text-heading); word-break: break-all; }
+.bd-note {
+    font-size: 14px;
+    color: var(--text-body);
+    background: var(--neutral-secondary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    white-space: pre-wrap;
+}
+</style>
+{% endblock %}
+
+{% block page_subtitle %}<p class="page-subtitle">可依指定球場、日期區間與預約狀態查詢會員預約資料。</p>{% endblock %}
+
+{% block page_actions %}
+{# 搜尋框對齊球場管理(.a-search):驅動 DataTables server-side search[value],300ms 去抖 #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋預約 / 會員 / 編號" aria-label="搜尋預約">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+<span v-if="activeCourseName" class="b-badge success lg" style="align-self: center;">
+    <span class="dot"></span>目前球場：[[ activeCourseName ]]
+</span>
+<div class="b-pop">
+    <button type="button" class="b-btn b-btn-filter" data-pop aria-expanded="false">
+        <i class="fa-solid fa-filter"></i>篩選<i class="fa-solid fa-chevron-down b-pop-caret"></i>
+    </button>
+    <div class="b-pop-panel">
+        <p class="b-pop-panel-title">篩選條件</p>
+        <div class="form-group">
+            <label class="b-label">球場</label>
+            <select v-model="filters.course_id" class="form-input">
+                <option value="">全部球場</option>
+                {% for course in courses %}
+                <option value="{{ course.id }}">{{ course.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="b-label">開始日期</label>
+            <input type="date" v-model="filters.start_date" class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="b-label">結束日期</label>
+            <input type="date" v-model="filters.end_date" class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="b-label">預約狀態</label>
+            <select v-model="filters.status" class="form-input">
+                <option value="">全部狀態</option>
+                <option value="pending">待確認</option>
+                <option value="confirmed">已確認</option>
+                <option value="checked_in">已報到</option>
+                <option value="pending_cancel">待取消</option>
+                <option value="cancelled">已取消</option>
+                <option value="completed">已完成</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="b-label">付款狀態</label>
+            <select v-model="filters.payment_status" class="form-input">
+                <option value="">全部付款狀態</option>
+                <option value="unpaid">未付款</option>
+                <option value="onsite">現場付款</option>
+                <option value="pending">付款中</option>
+                <option value="paid">已付款</option>
+                <option value="refunded">已退款</option>
+                <option value="failed">付款失敗</option>
+            </select>
+        </div>
+        <div class="b-pop-foot">
+            <button type="button" class="b-btn-reset" @click="resetFilters" data-pop-close>重置</button>
+            <button type="button" class="b-btn b-btn-primary b-btn-sm" @click="reloadAll" data-pop-close>套用</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# SPA:Jinja 資料走 data-page-globals(pageInit mount 前套用;Vue 模板編譯會剝掉 <script>,不可用 script 注入)#}
+<div hidden data-page-globals='{"BOOKING_COURSE_OPTIONS": [{% for course in courses %}{"id": "{{ course.id }}", "name": {{ course.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]}'></div>
+
+{# 精簡統計條:一排 inline chip,金額不再占大塊卡片。is-fixed-h 下當固定區不縮,表格吃剩餘高 #}
+<div class="booking-stat-bar">
+    <div class="booking-stat"><span class="booking-stat-label">總預約</span><span class="booking-stat-value num">[[ stats.total_bookings ]]</span></div>
+    <div class="booking-stat"><span class="booking-stat-label">總金額</span><span class="booking-stat-value num" style="color:var(--fg-success);">[[ formatCurrency(stats.total_amount) ]]</span></div>
+    <div class="booking-stat"><span class="booking-stat-label">總時數</span><span class="booking-stat-value num" style="color:var(--fg-brand);">[[ formatHours(stats.total_duration_hours) ]]</span></div>
+    <div class="booking-stat-sep"></div>
+    <div class="booking-stat"><span class="booking-stat-label">待確認</span><span class="booking-stat-value num" style="color:var(--fg-warning);">[[ stats.pending_count ]]</span></div>
+    <div class="booking-stat"><span class="booking-stat-label">已確認</span><span class="booking-stat-value num" style="color:var(--fg-success);">[[ stats.confirmed_count ]]</span></div>
+    <div class="booking-stat"><span class="booking-stat-label">待取消</span><span class="booking-stat-value num" style="color:var(--fg-danger);">[[ stats.pending_cancel_count ]]</span></div>
+    <div class="booking-stat"><span class="booking-stat-label">已取消</span><span class="booking-stat-value num" style="color:var(--fg-danger);">[[ stats.cancelled_count ]]</span></div>
+</div>
+
+{# 表格對齊球場管理:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、內滾、thead sticky #}
+<div class="b-tbl-scroll" data-filter-target>
+    <table id="bookingTable" class="b-tbl" style="width: 100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+{# 詳細 modal:主表只放重要欄位,完整資訊(聯絡/編號/付款明細/備註等)點「詳細」在此看 #}
+<transition name="b-modal-fade">
+<div v-if="showBookingDetail" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeBookingDetail">
+    <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="bookingDetailTitle" style="max-width: 680px;">
+        <div class="b-modal-head">
+            <div>
+                <h2 id="bookingDetailTitle" class="b-modal-title">預約詳細資訊</h2>
+                <p class="b-modal-sub" v-if="bookingDetail">[[ bookingDetail.booking_no ]]</p>
+            </div>
+            <button type="button" class="b-modal-close" @click="closeBookingDetail" aria-label="關閉">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="b-modal-body is-scroll-faded" style="max-height:min(620px,72vh); overflow-y:auto;">
+            <div v-if="bookingDetail">
+                <div class="bd-section-title">預約資訊</div>
+                <div class="bd-grid">
+                    <div class="bd-item"><span class="bd-label">預約編號</span><span class="bd-value">[[ bookingDetail.booking_no || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">球場</span><span class="bd-value">[[ bookingDetail.course_name || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">日期</span><span class="bd-value">[[ bookingDetail.play_date || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">時段</span><span class="bd-value">[[ String(bookingDetail.start_time||'').slice(0,5) ]] - [[ String(bookingDetail.end_time||'').slice(0,5) ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">時數</span><span class="bd-value">[[ bookingDetail.duration_hours || 1 ]] 小時</span></div>
+                    <div class="bd-item"><span class="bd-label">預約狀態</span><span class="bd-value" v-html="renderBookingStatus(bookingDetail.status)"></span></div>
+                    <div class="bd-item"><span class="bd-label">建立時間</span><span class="bd-value">[[ bookingDetail.created_at || '-' ]]</span></div>
+                </div>
+
+                <div class="bd-section-title">會員與聯絡</div>
+                <div class="bd-grid">
+                    <div class="bd-item"><span class="bd-label">會員</span><span class="bd-value">[[ bookingDetail.member_name || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">Email</span><span class="bd-value">[[ bookingDetail.member_email || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">電話</span><span class="bd-value">[[ bookingDetail.member_phone || '-' ]]</span></div>
+                </div>
+
+                <div class="bd-section-title">付款資訊</div>
+                <div class="bd-grid">
+                    <div class="bd-item"><span class="bd-label">付款狀態</span><span class="bd-value" v-html="renderPaymentStatus(bookingDetail.payment_status, bookingDetail)"></span></div>
+                    <div class="bd-item"><span class="bd-label">每小時價</span><span class="bd-value">$[[ Number(bookingDetail.hourly_price||0).toLocaleString() ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">總金額</span><span class="bd-value" style="color:var(--fg-success);font-weight:600;">$[[ Number(bookingDetail.total_price||0).toLocaleString() ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">付款方式</span><span class="bd-value">[[ bookingDetail.payment_provider || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">商店訂單號</span><span class="bd-value">[[ bookingDetail.payment_merchant_order_no || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">交易號</span><span class="bd-value">[[ bookingDetail.payment_trade_no || '-' ]]</span></div>
+                    <div class="bd-item"><span class="bd-label">付款時間</span><span class="bd-value">[[ bookingDetail.paid_at || '-' ]]</span></div>
+                    <div class="bd-item" v-if="bookingDetail.payment_error_message"><span class="bd-label">付款錯誤</span><span class="bd-value" style="color:var(--fg-danger);">[[ bookingDetail.payment_error_message ]]</span></div>
+                </div>
+
+                <div v-if="bookingDetail.note">
+                    <div class="bd-section-title">備註</div>
+                    <div class="bd-note">[[ bookingDetail.note ]]</div>
+                </div>
+            </div>
+            <div v-else style="padding:24px 0;color:var(--text-body-subtle);">找不到這筆預約資料。</div>
+        </div>
+    </div>
+</div>
+</transition>
+{% endblock %}
+

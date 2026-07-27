@@ -1,0 +1,125 @@
+{% extends "cms/base.html" %}
+
+{% block title %}Email 紀錄管理{% endblock %}
+{% block page_title %}Email 紀錄管理{% endblock %}
+{# 照球場管理/預約管理/會員管理:固定高框架 → 表格吃視窗剩餘高度、內滾、thead sticky,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block page_subtitle %}<p class="page-subtitle">查詢系統通知信是否成功寄出，並追蹤失敗原因。</p>{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 精簡統計條:一排 inline chip 取代大卡,對齊預約管理(is-fixed-h 下當固定區不縮,表格吃剩餘高) */
+.email-stat-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    padding: 12px 18px;
+    margin-bottom: 14px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xs);
+}
+.email-stat { display: inline-flex; align-items: baseline; gap: 8px; }
+.email-stat-label { color: var(--text-body-subtle); font-size: 13px; font-weight: 500; }
+.email-stat-value {
+    color: var(--text-heading);
+    font-size: 20px;
+    font-weight: var(--b-font-metric, 600);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+/* 表頭釘住:強制所有 thead th sticky(對齊球場管理/預約管理/會員管理的內滾表頭行為) */
+.b-tbl-scroll table.dataTable > thead > tr > th,
+.b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 狀態:表頭與內容都居中 */
+table.dataTable th.col-center,
+table.dataTable td.col-center { text-align: center; }
+
+.email-error-text {
+    max-width: 420px;
+    white-space: normal;
+    color: var(--fg-danger);
+    line-height: 1.5;
+}
+</style>
+{% endblock %}
+
+{% block page_actions %}
+{# 搜尋框對齊球場管理/預約管理/會員管理(.a-search):驅動 DataTables server-side search[value],300ms 去抖 #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋收件人 / 主旨 / 預約編號" aria-label="搜尋 Email 紀錄">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+<div class="b-pop">
+    <button type="button" class="b-btn b-btn-filter" data-pop aria-expanded="false">
+        <i class="fa-solid fa-filter"></i>篩選<i class="fa-solid fa-chevron-down b-pop-caret"></i>
+    </button>
+    <div class="b-pop-panel">
+        <p class="b-pop-panel-title">篩選條件</p>
+        <div class="form-group">
+            <label class="b-label">寄送狀態</label>
+            <select v-model="filters.status" class="form-input">
+                <option value="">全部狀態</option>
+                <option value="success">成功</option>
+                <option value="failed">失敗</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="b-label">通知類型</label>
+            <select v-model="filters.notification_type" class="form-input">
+                <option value="">全部類型</option>
+                <option value="member_registered">會員註冊完成</option>
+                <option value="booking_pending">預約待確認</option>
+                <option value="booking_cancelled">預約取消</option>
+                <option value="booking_reminder">明日提醒</option>
+                <option value="general">一般通知</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="b-label">開始日期</label>
+            <input type="date" v-model="filters.start_date" class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="b-label">結束日期</label>
+            <input type="date" v-model="filters.end_date" class="form-input">
+        </div>
+        <div class="b-pop-foot">
+            <button type="button" class="b-btn-reset" @click="resetFilters" data-pop-close>重置</button>
+            <button type="button" class="b-btn b-btn-primary b-btn-sm" @click="reloadAll" data-pop-close>套用</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# 精簡統計條:一排 inline chip,金額不再占大塊卡片。is-fixed-h 下當固定區不縮,表格吃剩餘高 #}
+<div class="email-stat-bar">
+    <div class="email-stat"><span class="email-stat-label">總寄送紀錄</span><span class="email-stat-value num">[[ stats.total_count ]]</span></div>
+    <div class="email-stat"><span class="email-stat-label">成功</span><span class="email-stat-value num" style="color:var(--fg-success);">[[ stats.success_count ]]</span></div>
+    <div class="email-stat"><span class="email-stat-label">失敗</span><span class="email-stat-value num" style="color:var(--fg-danger);">[[ stats.failed_count ]]</span></div>
+</div>
+
+{# 表格對齊球場管理:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、內滾、thead sticky #}
+<div class="b-tbl-scroll">
+    <table id="emailLogTable" class="b-tbl" style="width:100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+{% endblock %}

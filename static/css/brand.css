@@ -1,0 +1,30 @@
+/* ═══════════════════════════════════════════════════════════════════
+   [backend-design] Brand 設定檔 — ★ 每個專案只改這一檔 ★
+   ═══════════════════════════════════════════════════════════════════
+   整套後台的品牌色由這裡的 --b-chrome 衍生:
+   b_admin.css 會把 typeui brand token 家族(--brand / --brand-softer /
+   --brand-soft / --brand-medium / --brand-strong / --fg-brand /
+   --border-brand …)用 color-mix() 從 --b-chrome 算出來。
+   → 換一個值,按鈕 / 側欄 active / tab / focus ring / badge.brand /
+     連結 / stepper / toast icon … 全站自動跟著換,不用改任何元件。
+
+   引用方式(在 base/tokens 之後、b_admin.css 之前或之後皆可):
+     <link rel="stylesheet" href="/static/css/brand.css">
+   golfmaster 原本是寫在 base.html 內聯 <style>(值來自 DB 主題設定);
+   靜態專案直接用這檔即可。 */
+
+:root {
+    /* 品牌原色(logo、前台沿用;可與 chrome 不同) */
+    --b-primary: #173226;
+
+    /* ★ 後台 chrome 實際用色 — brand token 家族的唯一來源。
+       深色請配白字;若用淺色主色,記得同步調 --b-on-primary。 */
+    --b-chrome: #173226;
+
+    /* brand 底上的文字色(主按鈕文字、側欄 active pill 文字…) */
+    --b-on-primary: #ffffff;
+
+    /* 舊變數 alias(base.css / components.css 部分規則還在吃) */
+    --primary-color: var(--brand);
+    --primary-dark: var(--brand-strong);
+}

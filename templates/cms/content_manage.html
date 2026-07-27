@@ -1,0 +1,157 @@
+{% extends "cms/base.html" %}
+
+{% block title %}內容管理{% endblock %}
+{% block page_title %}內容管理{% endblock %}
+{# 照球場管理/預約管理/會員管理:固定高框架 → 表格吃視窗剩餘高度、內滾、thead sticky,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 表頭釘住:強制所有 thead th sticky(對齊球場管理/預約管理/會員管理的內滾表頭行為) */
+.b-tbl-scroll table.dataTable > thead > tr > th,
+.b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 狀態:表頭與內容都居中 */
+table.dataTable th.col-center,
+table.dataTable td.col-center { text-align: center; }
+</style>
+{% endblock %}
+
+{% block page_actions %}
+{# 搜尋框對齊球場管理/預約管理/會員管理(.a-search):驅動 DataTables server-side search[value],300ms 去抖 #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋標題" aria-label="搜尋內容">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+<button @click="openAddForm" class="b-btn b-btn-primary">
+    <i class="fa-solid fa-plus"></i>
+    新增內容
+</button>
+{% endblock %}
+
+{% block content %}
+{# 三件套範本:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、內滾、thead sticky #}
+<div class="b-tbl-scroll">
+    <table id="contentTable" class="b-tbl" style="width: 100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- 新增/編輯:大 modal 左右兩欄(左=標題/排序/附件,右=TinyMCE);對齊系統 modal:is-soft + 淡入淡出 + 無取消。
+     ✕/點遮罩 → requestClose(有輸入/修改才跳「放棄」確認,否則直接關) -->
+<transition name="b-modal-fade">
+<div v-show="showForm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="requestClose">
+    <div class="b-modal is-soft content-edit-modal" role="dialog" aria-modal="true">
+        <div class="b-modal-head">
+            <h2 class="b-modal-title">[[ isEdit ? '編輯內容' : '新增內容' ]]</h2>
+            <button type="button" class="b-modal-close" @click="requestClose" aria-label="關閉">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="b-modal-body content-edit-body">
+            <!-- 左欄:標題 / 排序 / 附件 -->
+            <div class="content-edit-side">
+                <div class="form-group">
+                    <label class="form-label">標題 <span style="color: var(--danger-color);">*</span></label>
+                    <input type="text" v-model="formData.title" placeholder="請輸入標題"
+                           :class="['form-input', errors.title ? 'error' : '']">
+                    <p v-if="errors.title" class="form-error">[[ errors.title ]]</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">排序</label>
+                    <input type="number" v-model.number="formData.sort" min="0" max="255"
+                           class="form-input" style="max-width: 120px;">
+                </div>
+                <div class="content-edit-files">
+                    <!-- 標籤左 + 「上傳」文字鈕右(hover 亮起) -->
+                    <div class="content-files-head">
+                        <label class="form-label" style="margin:0;">附件</label>
+                        <button type="button" class="content-files-upload" @click="openFilePicker">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> 上傳
+                        </button>
+                    </div>
+                    <!-- 附件框:吃左欄剩餘高(與編輯器等高)、內滾;可拖放;空狀態 -->
+                    <div class="content-files-box" :class="{ 'is-dragover': isDragging }"
+                         @dragover.prevent="isDragging = true"
+                         @dragleave.prevent="isDragging = false"
+                         @drop.prevent="onDrop($event)">
+                        <!-- 上傳中 -->
+                        <div v-for="(uf, idx) in uploadingFiles" :key="'up' + idx" class="content-file-item">
+                            <i class="fa-solid fa-spinner fa-spin content-file-icon"></i>
+                            <span class="content-file-name">[[ uf.name ]]</span>
+                            <span class="content-file-pct">[[ uf.progress ]]%</span>
+                        </div>
+                        <!-- 已上傳(最新在最上面;每筆前面帶「該類型顏色」的檔案圖示) -->
+                        <div v-for="file in attachedFilesView" :key="file.id" class="content-file-item">
+                            <i :class="getFileIcon(file.mime_type)" class="content-file-icon"
+                               :style="{ color: getFileColor(file.mime_type) }"></i>
+                            <span class="content-file-name" :title="file.original_name">[[ file.original_name ]]</span>
+                            <a :href="getDownloadUrl(file.id)" class="content-file-act" title="下載">
+                                <i class="fa-solid fa-download"></i>
+                            </a>
+                            <button type="button" @click="deleteFile(file.id, file.original_name)" class="content-file-act is-danger" title="刪除">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                        <!-- 空狀態 -->
+                        <div v-if="attachedFiles.length === 0 && uploadingFiles.length === 0" class="content-files-empty">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <span>未上傳任何附件</span>
+                        </div>
+                    </div>
+                    <!-- ⚠️ SPA 雙層 app $refs 取不到 → class + document.querySelector(openFilePicker) -->
+                    <input type="file" class="js-content-file-input" multiple
+                           @change="onFileSelect($event)" style="display: none;"
+                           accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z">
+                </div>
+            </div>
+            <!-- 右欄:TinyMCE 編輯器(填滿) -->
+            <div class="content-edit-main">
+                <label class="form-label">內容</label>
+                <div class="editor-container">
+                    <textarea id="editor"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="b-modal-foot">
+            <button type="button" @click="submitForm" :disabled="isSubmitting || formIncomplete" class="b-btn b-btn-text">
+                <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                <span>[[ isEdit ? '儲存變更' : '確認新增' ]]</span>
+            </button>
+        </div>
+    </div>
+</div>
+</transition>
+
+<!-- 關閉確認:有輸入/修改才跳(對齊球場管理的 .b-modal.is-alert)-->
+<transition name="b-modal-fade">
+<div v-show="showCloseConfirm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="cancelClose">
+    <div class="b-modal is-alert" role="alertdialog" aria-modal="true" aria-labelledby="contentCloseConfirmTitle">
+        <div class="b-alert-body">
+            <div class="b-alert-icon b-alert-icon-danger" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 id="contentCloseConfirmTitle" class="b-alert-title">要放棄這次編輯嗎?</h2>
+            <p class="b-alert-desc">你[[ isEdit ? '對這篇內容的修改' : '輸入的內容' ]]尚未儲存,現在關閉不會保留。</p>
+        </div>
+        <div class="b-alert-foot">
+            <button type="button" class="b-btn b-btn-quiet" @click="cancelClose">繼續編輯</button>
+            <button type="button" class="b-btn b-btn-text b-btn-text-danger" @click="confirmClose">放棄並關閉</button>
+        </div>
+    </div>
+</div>
+</transition>
+{% endblock %}
+

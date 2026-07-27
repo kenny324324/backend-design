@@ -1,0 +1,43 @@
+{% extends "cms/b_admin/base.html" %}
+{% import "cms/b_admin/_components.html" as ui with context %}
+{% block title %}多語內容{% endblock %}
+{% block page_title %}多語內容{% endblock %}
+{% block main_modifier %}is-fixed-h{% endblock %}
+{% block content %}
+
+<p class="mb-4 text-sm" style="color:var(--text-body-subtle);">
+    左欄為中文(主資料),右側各語系留空時,前台會自動顯示中文。
+</p>
+
+{# 表格包在 form 裡(整張表一起送出)但仍要「表頭釘住 + 框內滾」:
+   form 帶 is-fixed-h-form → 自身當 fixed-h 伸展子項,內部 .b-tbl-scroll 吃剩餘高度、儲存鈕固定底部。 #}
+<form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.i18n') }}"
+      class="is-fixed-h-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% set headers = ["項目", "中文(主資料)"] + langs|map(attribute='name')|list %}
+    {% call ui.table(headers) %}
+        {% for it in items %}
+        <tr class="border-t">
+            <td class="px-3 py-2 font-semibold">{{ it.label }}</td>
+            <td class="px-3 py-2" style="color:var(--text-body-subtle);">{{ it.base }}</td>
+            {% for l in langs %}
+            <td class="px-3 py-2">
+                {% if it.multiline %}
+                <textarea name="val_{{ it.idx }}_{{ l.code }}" rows="3" class="b-textarea">{{ it.vals[l.code] }}</textarea>
+                {% else %}
+                <input name="val_{{ it.idx }}_{{ l.code }}" value="{{ it.vals[l.code] }}" class="b-input">
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% else %}
+            {{ ui.empty_row(langs|length + 2, "目前沒有可翻譯的項目。") }}
+        {% endfor %}
+    {% endcall %}
+
+    {% if items %}
+    <button class="b-btn b-btn-primary mt-4">儲存</button>
+    {% endif %}
+</form>
+{% endblock %}

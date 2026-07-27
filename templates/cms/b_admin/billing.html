@@ -1,0 +1,149 @@
+{% extends "cms/b_admin/base.html" %}
+{% import "cms/b_admin/_components.html" as ui with context %}
+{% block title %}帳務管理{% endblock %}
+{% block page_title %}帳務管理{% endblock %}
+{% set type_label = {'collect':'收款','refund':'退款'} %}
+{% set status_label = {'pending':'待處理','done':'已完成','void':'作廢'} %}
+{% set method_label = {'newebpay':'線上','onsite':'現場','cash':'現金','other':'其他'} %}
+{% block main_modifier %}is-fixed-h is-billing-fixed{% endblock %}
+
+{% block page_actions %}
+{{ ui.action_button("新增紀錄", icon="plus", modal_id="billing-add-modal") }}
+{% endblock %}
+
+{% block content %}
+
+{# KPI:待補收 / 待退款 皆為「待辦金額」,統一中性色,不用紅綠避免誤導。矮版卡(is-compact)減 padding #}
+<div class="b-kpi-grid mb-4" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+    <div class="b-kpi is-compact">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">待補收總額</span>
+            <span class="b-kpi-icon"><i data-lucide="hand-coins" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ "%.0f"|format(summary.pending_collect or 0) }}</div>
+    </div>
+    <div class="b-kpi is-compact">
+        <div class="b-kpi-head">
+            <span class="b-kpi-label">待退款總額</span>
+            <span class="b-kpi-icon"><i data-lucide="undo-2" aria-hidden="true"></i></span>
+        </div>
+        <div class="b-kpi-value num">{{ "%.0f"|format(summary.pending_refund or 0) }}</div>
+    </div>
+</div>
+
+<!-- 視圖切換 + 篩選(同一行:切換靠左、篩選靠右;篩選只在收付明細視圖顯示)。
+     切換由 JS 攔截:滑塊平滑滑動 + 只抽換 data-view-filter / data-view-body 兩塊(膠囊列不動)。 -->
+<div class="mb-4 flex items-center justify-between gap-3">
+    <div class="b-seg is-pill no-anim" data-seg-toggle>
+        <span class="b-seg-thumb" aria-hidden="true"></span>
+        <a href="{{ url_for('cms_b_admin.billing', view='records') }}" class="{{ 'active' if view!='orders' }}">收付明細</a>
+        <a href="{{ url_for('cms_b_admin.billing', view='orders') }}" class="{{ 'active' if view=='orders' }}">依訂單彙總</a>
+    </div>
+    <div data-view-filter>
+    {% if view != 'orders' %}
+    {% call ui.filter_panel(
+        action=url_for('cms_b_admin.billing'),
+        active={'status': f_status if f_status != 'pending' else ''},
+        reset_href=url_for('cms_b_admin.billing', status='pending')
+    ) %}
+        <label class="b-label">狀態
+            <select name="status" class="b-select">
+                {% for k, v in status_label.items() %}<option value="{{ k }}" {{ 'selected' if f_status==k }}>{{ v }}</option>{% endfor %}
+            </select>
+        </label>
+    {% endcall %}
+    {% endif %}
+    </div><!-- /data-view-filter -->
+</div><!-- /top row -->
+
+<div data-view-body class="b-view-body">
+{% if view == 'orders' %}
+{# 彙總 = 訂單卡列表。固定框(邊框/圓角/shadow 永遠完整)+ 框內捲動,做法對齊排程設定 tab #}
+<div class="b-billing-orders">
+    <div class="b-billing-orders-scroll">
+    {% for o in orders %}
+    <div class="b-card">
+        <div class="b-card-head flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <span class="font-semibold">{{ o.code }}</span>
+                <span class="ml-2" style="color:var(--text-body-subtle);">{{ o.guest_name }} · {{ o.play_date }} {{ o.tee_time }} · {{ o.players }}人</span>
+            </div>
+            <div class="flex gap-4 text-sm">
+                <span>應收 <strong>{{ "%.0f"|format(o.total_price or 0) }}</strong></span>
+                <span>已收 <strong>{{ "%.0f"|format(o.paid_amount or 0) }}</strong></span>
+                <span>餘額
+                    <strong{% if o.balance > 0 %} style="color:var(--fg-warning-subtle);"{% endif %}>
+                    {% if o.balance > 0 %}待收 {{ "%.0f"|format(o.balance) }}
+                    {% elif o.balance < 0 %}待退 {{ "%.0f"|format(-o.balance) }}
+                    {% else %}0{% endif %}</strong>
+                </span>
+            </div>
+        </div>
+        <table class="b-tbl">
+            <tbody>
+                {% for r in o.records %}
+                <tr class="border-t">
+                    <td class="px-4 py-1 whitespace-nowrap" style="color:var(--text-body-subtle);">{{ r.created_at }}</td>
+                    <td class="px-4 py-1">{{ ui.badge(type_label[r.record_type], 'warn' if r.record_type=='collect' else 'neutral', dot=False) }}</td>
+                    <td class="px-4 py-1 text-right font-semibold num">{{ "%.0f"|format(r.amount or 0) }}</td>
+                    <td class="px-4 py-1">{{ method_label.get(r.method, r.method or '') }}</td>
+                    <td class="px-4 py-1">{{ status_label.get(r.status, r.status) }}</td>
+                    <td class="px-4 py-1" style="color:var(--text-body-subtle);">{{ r.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="b-empty">尚無任何收付紀錄的訂單。</div>
+    {% endfor %}
+    </div><!-- /b-billing-orders-scroll -->
+</div><!-- /b-billing-orders -->
+{% else %}
+
+{# 收付明細寬表(局部內滾:表頭釘住、只滾表格區) #}
+{% set headers = ["時間", "預約", "姓名", "類型", "金額", "方式", "說明", "狀態", "操作"] %}
+{% call ui.table(headers) %}
+    {% for r in records %}
+    <tr class="border-t">
+        <td class="px-3 py-2 whitespace-nowrap">{{ r.created_at }}</td>
+        <td class="px-3 py-2 font-semibold">{{ r.code }}<div class="text-xs" style="color:var(--text-body-subtle);">{{ r.play_date }} {{ r.tee_time }}</div></td>
+        <td class="px-3 py-2">{{ r.guest_name }}</td>
+        <td class="px-3 py-2">{{ ui.badge(type_label[r.record_type], 'warn' if r.record_type=='collect' else 'neutral', dot=False) }}</td>
+        <td class="px-3 py-2 text-right font-bold num">{{ "%.0f"|format(r.amount or 0) }}</td>
+        <td class="px-3 py-2">{{ method_label.get(r.method, r.method or '') }}</td>
+        <td class="px-3 py-2">{{ r.description }}</td>
+        <td class="px-3 py-2">
+            {{ ui.badge(status_label[r.status], 'ok' if r.status == 'done' else ('neutral' if r.status == 'void' else 'warn')) }}
+        </td>
+        <td class="px-3 py-2">
+            <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.billing_record_status', record_id=r.id) }}" class="flex gap-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="back_status" value="{{ f_status }}">
+                {% if r.status != 'done' %}<button name="status" value="done" class="b-btn b-btn-success b-btn-xs">完成</button>{% endif %}
+                {% if r.status != 'void' %}<button name="status" value="void" class="b-btn b-btn-ghost b-btn-xs">作廢</button>{% endif %}
+                {% if r.status != 'pending' %}<button name="status" value="pending" class="b-btn b-btn-ghost b-btn-xs">待處理</button>{% endif %}
+            </form>
+        </td>
+    </tr>
+    {% else %}
+        {{ ui.empty_row(9, "沒有符合的收付紀錄。") }}
+    {% endfor %}
+{% endcall %}
+{% endif %}
+</div><!-- /data-view-body -->
+
+{# 新增收付紀錄:右上按鈕開此 modal(對齊 bookings/caddies 新增流程) #}
+{% call ui.form_modal(
+    "billing-add-modal",
+    "新增收付紀錄",
+    action=preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.billing_add'),
+    submit_label="新增紀錄",
+    require_fill=True
+) %}
+    {{ ui.field("code", "預約編號", required=True, placeholder="請輸入預約編號") }}
+    {{ ui.select_field("record_type", "類型", [('collect','收款'),('refund','退款')]) }}
+    {{ ui.field("amount", "金額", type="number", required=True, placeholder="金額", attrs='min="1" step="1"') }}
+    {{ ui.field("description", "說明", span="col-span-2", placeholder="選填說明") }}
+{% endcall %}
+{% endblock %}

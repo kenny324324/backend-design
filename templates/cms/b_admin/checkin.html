@@ -1,0 +1,67 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}報到掃描{% endblock %}
+{% block page_title %}報到掃描{% endblock %}
+{% block main_modifier %}is-fixed-h is-checkin-fixed{% endblock %}
+{% block content %}
+<div id="b-checkin" class="b-checkin-grid"
+     data-lookup-url="{{ url_for('cms_b_admin.checkin_lookup') }}"
+     data-confirm-url="{{ url_for('cms_b_admin.checkin_confirm') }}">
+
+    <!-- 左欄:掃描 + 手動查詢 -->
+    <section class="b-card b-checkin-scan">
+        <div class="b-card-head">
+            <h2 class="b-card-title">掃描報到</h2>
+        </div>
+        <div class="b-card-body">
+            <div class="b-cam" id="b-cam">
+                <video id="b-video" autoplay muted playsinline class="b-cam-video"></video>
+                <div class="b-cam-idle" id="b-cam-idle">
+                    <span class="b-cam-idle-icon"><i data-lucide="scan-line" aria-hidden="true"></i></span>
+                    <p class="b-cam-idle-text">點「開啟掃描」後，將顧客完成頁的報到 QR 對準畫面</p>
+                </div>
+            </div>
+            <p id="b-cam-msg" class="b-checkin-hint">使用相機掃描顧客完成頁的報到 QR。</p>
+
+            <div class="b-checkin-actions">
+                <button type="button" id="b-scan-start" class="b-btn b-btn-primary">
+                    <i data-lucide="camera" aria-hidden="true"></i><span>開啟掃描</span>
+                </button>
+                <button type="button" id="b-scan-stop" class="b-btn b-btn-danger-soft hidden">
+                    <i data-lucide="square" aria-hidden="true"></i><span>停止</span>
+                </button>
+            </div>
+
+            <div class="b-checkin-manual">
+                <label class="b-label" for="b-manual">或手動輸入預約編號</label>
+                <div class="b-checkin-manual-row">
+                    <input id="b-manual" class="b-input" placeholder="請輸入預約編號" autocomplete="off">
+                    <button type="button" id="b-manual-btn" class="b-btn b-btn-dark">
+                        <i data-lucide="search" aria-hidden="true"></i><span>查詢</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 右欄:查詢 / 報到結果 -->
+    <section class="b-card b-checkin-result">
+        <div class="b-card-head">
+            <h2 class="b-card-title">報到結果</h2>
+        </div>
+        <div class="b-card-body">
+            <div id="b-result">
+                <div class="b-empty" style="padding:48px 24px;">
+                    <span class="b-empty-icon"><i data-lucide="qr-code" aria-hidden="true"></i></span>
+                    <p class="b-empty-title">尚未查詢</p>
+                    <p class="b-empty-sub">掃描 QR 或輸入預約編號後，這裡會顯示顧客的預約與報到狀態。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# SPA:jsQR + checkin.js 已移到 base.html 殼層;此頁 extra_js 留空。
+   離開頁時 spa.js 會呼叫 checkin 的 cleanup 停相機 stream。 #}
+{% endblock %}

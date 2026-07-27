@@ -1,0 +1,47 @@
+{% extends "cms/base.html" %}
+
+{% block title %}會員管理{% endblock %}
+{% block page_title %}會員管理{% endblock %}
+{# 照球場管理/預約管理:固定高框架 → 表格吃視窗剩餘高度、內滾、thead sticky,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 表頭釘住:強制所有 thead th sticky(對齊球場管理/預約管理的內滾表頭行為) */
+.b-tbl-scroll table.dataTable > thead > tr > th,
+.b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 預約數:表頭與內容都居中 */
+table.dataTable th.col-center,
+table.dataTable td.col-center { text-align: center; }
+</style>
+{% endblock %}
+
+{% block page_actions %}
+{# 搜尋框對齊球場管理/預約管理(.a-search):驅動 DataTables server-side search[value],300ms 去抖 #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋姓名 / Email / 手機" aria-label="搜尋會員">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+{# 表格對齊球場管理:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、內滾、thead sticky #}
+<div class="b-tbl-scroll">
+    <table id="memberTable" class="b-tbl" style="width: 100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,604 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}時段管理{% endblock %}
+{% block page_title %}時段管理{% endblock %}
+{% block main_modifier %}is-slots-fixed{% endblock %}
+{% block extra_css %}
+<style>
+    .b-tab { padding: 10px 16px; font-size: 14px; border-bottom: 2px solid transparent; color: var(--text-body); transition: color .15s, border-color .15s; }
+    .b-tab:hover { color: var(--text-heading); border-bottom-color: var(--border-default-strong); }
+    .b-tab-active { border-bottom-color: var(--border-brand); color: var(--fg-brand); font-weight: 600; }
+
+    /* 週切換列:與下方卡片合體為一個視覺容器 */
+    .b-slots-status-wrap {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-xs);
+        background: var(--neutral-primary-soft);
+        overflow: hidden;
+    }
+    .main-content.is-slots-fixed .b-panel[data-panel="status"] .b-slots-status-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    /* 週切換列:貼頂細條 */
+    .b-week-bar {
+        display: flex;
+        align-items: stretch;
+        border-bottom: 1px solid var(--border-default);
+        background: var(--neutral-tertiary);
+        flex: 0 0 auto;
+    }
+    /* 卡片主體:有 padding,flex column 撐滿剩餘高 */
+    .b-slots-card-body {
+        padding: 16px 20px 16px;
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        gap: 12px;
+    }
+    .b-slots-card-body .b-grid-scroll { flex: 1 1 auto; min-height: 0; margin-top: 0; }
+
+    /* 當日摘要:一行 inline,取代三張大卡 */
+    .b-day-summary {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: 0 0 auto;
+    }
+    .b-day-summary-item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+    }
+    .b-day-summary-item .dss-label { font-size: 13px; color: var(--text-body-subtle); }
+    .b-day-summary-item .dss-num { font-size: 20px; font-weight: 700; color: var(--text-heading); line-height: 1; }
+    .b-day-summary-sep { width: 1px; height: 16px; background: var(--border-default); }
+
+    /* 摘要列:統計靠左、篩選按鈕靠右,同一列 */
+    .b-slots-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex: 0 0 auto;
+        flex-wrap: wrap;
+    }
+
+    .b-week-nav {
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        font-size: 18px;
+        color: var(--text-body-subtle);
+        text-decoration: none;
+        border-right: 1px solid var(--border-default);
+        transition: background .12s, color .12s;
+        line-height: 1;
+        user-select: none;
+    }
+    .b-week-nav:last-child { border-right: none; border-left: 1px solid var(--border-default); }
+    .b-week-nav:hover { background: var(--neutral-tertiary); color: var(--text-heading); }
+    .b-week-nav.disabled { opacity: .3; pointer-events: none; }
+
+    .b-week-days {
+        display: flex;
+        flex: 1;
+        overflow-x: auto;
+    }
+    .b-week-day {
+        flex: 1;
+        min-width: 76px;
+        display: flex;
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: center;
+        padding: 9px 6px;
+        gap: 6px;
+        text-decoration: none;
+        color: var(--text-body);
+        border-right: 1px solid var(--border-default);
+        border-bottom: 2px solid transparent;
+        transition: background .12s, color .12s, border-bottom-color .12s;
+    }
+    .b-week-day:last-child { border-right: none; }
+    .b-week-day:hover { background: var(--neutral-tertiary); color: var(--text-heading); }
+    .b-week-day .wd-date { font-size: 16px; font-weight: 600; color: inherit; }
+    .b-week-day .wd-dow  { font-size: 13px; color: var(--text-body-subtle); }
+    .b-week-day.is-sel {
+        background: var(--brand);
+        color: var(--b-on-primary, #fff);
+        border-bottom-color: var(--brand);
+        font-weight: 600;
+    }
+    .b-week-day.is-sel .wd-date,
+    .b-week-day.is-sel .wd-dow { color: var(--b-on-primary, #fff); }
+    .b-week-day.is-sel .wd-dow { opacity: .85; }
+    .b-week-day.is-today .wd-date::after {
+        content: '';
+        display: inline-block;
+        width: 4px; height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+        margin-left: 3px;
+        vertical-align: middle;
+    }
+
+    /* 排程表單分組:同一張卡片內只靠「小標 + 大留白」切區塊。線只留分組之間一條。
+       分隔線畫在區塊上緣,但 legend 再往下推 → 線與標題之間留白,線明顯在「上面」。 */
+    .b-fieldset { border: 0; margin: 0; padding: 0; }
+    .b-fieldset + .b-fieldset { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--border-default); }
+    .b-fieldset-legend { display: block; font-size: 14px; font-weight: 600; color: var(--text-heading); padding: 0; margin-bottom: 16px; }
+    /* 價格規則:①②③ 三層純「小標 + 留白」,不用細條、不用框。編號中性色。 */
+    .b-price-tier + .b-price-tier { margin-top: 20px; }
+    .b-price-tier-label { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+    .b-price-tier-no { font-size: 13px; font-weight: 700; color: var(--text-heading); }
+    .b-price-tier-name { font-size: 14px; font-weight: 500; color: var(--text-heading); }
+    .b-price-tier-note { font-size: 12px; color: var(--text-body-subtle); }
+    /* 價格順序提示條:放在價格區塊最上方,一眼看懂覆蓋方向(唯一一處講順序) */
+    .b-price-order { font-size: 12px; color: var(--text-body-subtle); margin-bottom: 18px; }
+    .b-price-order b { color: var(--text-body); font-weight: 600; }
+    /* 排程/球區卡片標題列:底色調成稍深灰(對齊時段狀態週切換列 .b-week-bar);標題+副標題直排 */
+    .b-panel[data-panel="schedule"] .b-card-head,
+    .b-panel[data-panel="zones"] .b-card-head {
+        display: block;
+        background: var(--neutral-tertiary);
+    }
+    .b-card-subtitle { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--text-body-subtle); }
+
+    /* 動態列:固定欄寬,右邊緣對齊(取代原本一長排 w-auto 造成的鋸齒)。
+       末欄「移除」= 文字鈕貼在時間欄旁,右側多的空間自然留白(不用 1fr 推到最右)。 */
+    .b-row-grid { display: grid; align-items: center; gap: 8px; }
+    .b-session-grid { grid-template-columns: 128px 132px 16px 132px auto; justify-content: start; }
+    .b-dateprice-grid { grid-template-columns: 148px 16px 148px 112px auto; justify-content: start; }
+    .b-row-sep { text-align: center; color: var(--text-body-subtle); }
+    /* 移除鈕:文字款、紅字(對應 b-btn-text 但改危險色);hover 才出現淡紅底 */
+    .b-btn-text-danger { color: var(--fg-danger); }
+    .b-btn-text-danger:hover { background: var(--danger-soft); color: var(--fg-danger); }
+    /* 同列按鈕維持 32px(b-btn-sm),靠 grid/flex 垂直置中對齊 input。
+       排程/球區 tab 全頁欄位統一 32px:覆寫 --field-height,input/select/date/time/dropdown 全部跟按鈕齊高。 */
+    .b-panel[data-panel="schedule"],
+    .b-panel[data-panel="zones"] {
+        --field-height: 32px;
+    }
+
+    /* ── 球區設定:列項卡 + 動作選單 + 空狀態 ── */
+    .b-zone-caption { font-size: 12px; color: var(--text-body-subtle); }
+    .b-zone-list { display: flex; flex-direction: column; gap: 8px; }
+    .b-zone-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        background: var(--neutral-primary-soft);
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .b-zone-item:hover { border-color: var(--border-default-strong); box-shadow: var(--shadow-xs); }
+    .b-zone-name { flex: 1 1 auto; font-size: 14px; font-weight: 500; color: var(--text-heading); }
+    .b-zone-edit { flex: 1 1 auto; align-items: center; gap: 8px; }
+    .b-zone-menu { flex: 0 0 auto; margin-left: auto; }
+    .b-zone-item:not(.is-editing) .b-zone-edit { display: none; }
+    .b-zone-item.is-editing .b-zone-edit { display: flex; }
+    /* 改名編輯態:名稱 + ⋯ 隱藏,edit form 顯示(靠 JS 切 .is-editing) */
+    .b-zone-item.is-editing .b-zone-name,
+    .b-zone-item.is-editing .b-zone-menu { display: none; }
+
+    /* 空狀態引導 */
+    .b-zone-empty {
+        display: flex; flex-direction: column; align-items: center; text-align: center;
+        padding: 40px 24px;
+        border: 1px dashed var(--border-default-strong);
+        border-radius: var(--radius-md);
+        background: var(--neutral-secondary-soft);
+    }
+    .b-zone-empty-icon {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 48px; height: 48px; margin-bottom: 12px;
+        border-radius: var(--radius-full);
+        background: var(--brand-softer); color: var(--fg-brand);
+    }
+    .b-zone-empty-icon i { width: 22px; height: 22px; }
+    .b-zone-empty-title { font-size: 15px; font-weight: 600; color: var(--text-heading); margin-bottom: 4px; }
+    .b-zone-empty-desc { font-size: 13px; color: var(--text-body-subtle); max-width: 380px; line-height: 1.6; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="b-slots-tabs mb-5 flex gap-2 border-b">
+    <button type="button" class="b-tab" data-tab="status">時段狀態</button>
+    <button type="button" class="b-tab" data-tab="schedule">排程設定</button>
+    <button type="button" class="b-tab" data-tab="zones">球區設定</button>
+</div>
+
+<!-- ③ 時段狀態 -->
+<div class="b-panel" data-panel="status">
+    <section class="b-slots-status-wrap">
+        <!-- 週切換列:貼頂、無 padding、灰底細條 -->
+        <div class="b-week-bar">
+            <a href="{{ url_for('cms_b_admin.slots', week=week-1) if week > 0 else '#' }}"
+               class="b-week-nav {{ 'disabled' if week == 0 }}" title="上一週">‹</a>
+            <div class="b-week-days">
+                {% for d in week_dates %}
+                <a href="{{ url_for('cms_b_admin.slots', week=week, date=d.iso) }}"
+                   class="b-week-day {{ 'is-sel' if d.iso==sel }} {{ 'is-today' if d.is_today is defined and d.is_today }}">
+                    <span class="wd-date">{{ d.label }}</span>
+                    <span class="wd-dow">週{{ d.weekday }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('cms_b_admin.slots', week=week+1) }}"
+               class="b-week-nav" title="下一週">›</a>
+        </div>
+
+        <!-- 卡片主體:有 padding -->
+        <div class="b-slots-card-body">
+
+        <!-- 摘要列:統計靠左 + 篩選下拉靠右 -->
+        <div class="b-slots-toolbar">
+            <div class="b-day-summary">
+                <span class="b-day-summary-item"><span class="dss-label">當日預約</span><span class="dss-num num">{{ day_summary.total }}</span></span>
+                <span class="b-day-summary-sep"></span>
+                <span class="b-day-summary-item"><span class="dss-label">待確認</span><span class="dss-num num">{{ day_summary.pending }}</span></span>
+                <span class="b-day-summary-sep"></span>
+                <span class="b-day-summary-item"><span class="dss-label">已付款</span><span class="dss-num num">{{ day_summary.paid }}</span></span>
+            </div>
+            {% if zones and grid %}
+            <!-- 篩選:按鈕 → 向下展開 .b-pop 面板(沿用共用外觀);內部為前端過濾,不重整 -->
+            <div class="b-pop" id="slots-filter-pop">
+                <button type="button" class="b-btn b-btn-filter" data-pop aria-haspopup="true" aria-expanded="false">
+                    <i data-lucide="list-filter" aria-hidden="true"></i>
+                    <span>篩選</span>
+                </button>
+                <div class="b-pop-panel">
+                    <div class="b-pop-panel-title">篩選時段</div>
+                    <div class="grid grid-cols-1 gap-3">
+                        {% if sessions %}
+                        <div>
+                            <label class="b-label" for="filter-session">時段</label>
+                            <select id="filter-session" class="b-select">
+                                <option value="">全部時段</option>
+                                {% for s in sessions %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label class="b-label" for="filter-hour">時間</label>
+                            <select id="filter-hour" class="b-select">
+                                <option value="all">全部時間</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="b-pop-foot">
+                        <button type="button" class="b-btn-reset" id="filter-reset">重置</button>
+                        <button type="button" class="b-btn b-btn-primary b-btn-sm" data-pop-close>套用篩選</button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 區段表:時間 × 球區(限高捲動框:框內上下/左右內滾、thead 時間標題釘住,不整頁捲) -->
+        <div class="mt-3 b-grid-scroll">
+            {% if zones and grid %}
+            <table class="b-tbl" id="grid-table">
+                <thead>
+                    <tr>
+                        <th class="px-2 py-2 w-20 text-center">時間</th>
+                        {% for z in zones %}<th class="px-2 py-2 text-center">{{ z.name }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in grid %}
+                    <tr class="grid-row" data-session="{{ row.session }}" data-hour="{{ row.hour }}">
+                        <td class="border px-2 py-2 text-center font-semibold">{{ row.time }}</td>
+                        {% for c in row.cells %}
+                        {% set past_empty = row.past and not c.bookings %}
+                        <td class="border p-0 text-center text-sm
+                            {% if past_empty %}bg-gray-100
+                            {% elif c.bookings %}bg-amber-100
+                            {% elif c.state in ['paused','blocked','reserved'] %}bg-gray-200 text-gray-500
+                            {% elif c.state=='full' %}bg-red-100
+                            {% elif c.state=='open' %}bg-green-50{% endif %}">
+                            {% if c.state=='none' %}
+                            <div class="px-2 py-2">—</div>
+                            {% elif past_empty %}
+                            <div class="px-2 py-3">&nbsp;</div>
+                            {% else %}
+                            <button type="button" class="b-cell w-full px-2 py-2"
+                                    data-slot-id="{{ c.slot_id }}" data-time="{{ row.time }}"
+                                    data-zone="{{ c.zone }}" data-zone-id="{{ c.zone_id }}"
+                                    data-state="{{ c.state }}" data-remaining="{{ c.remaining }}"
+                                    data-past="{{ 1 if row.past else 0 }}"
+                                    data-bookings='{{ c.bookings|tojson }}'>
+                                {% if c.state in ['paused','blocked'] %}暫停
+                                {% elif c.state=='reserved' %}保留
+                                {% else %}
+                                    {% if c.bookings %}
+                                    <div class="font-semibold">{{ c.bookings[0].name }}{% if c.bookings|length>1 %} +{{ c.bookings|length-1 }}{% endif %}</div>
+                                    {% endif %}
+                                    <div class="text-sm font-semibold">{% if c.state=='full' %}額滿{% else %}剩餘 {{ c.remaining }} 人{% endif %}</div>
+                                {% endif %}
+                            </button>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="py-6 text-center text-gray-500">尚未設定球區或排程,無時段可顯示(請先到「排程設定 / 球區設定」)。</p>
+            {% endif %}
+        </div>
+
+        <!-- 圖例 -->
+        <div class="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+            <span><i class="mr-1 inline-block h-3 w-3 bg-amber-100 align-middle"></i>已預約</span>
+            <span><i class="mr-1 inline-block h-3 w-3 border bg-green-50 align-middle"></i>可預約</span>
+            <span><i class="mr-1 inline-block h-3 w-3 bg-red-100 align-middle"></i>額滿</span>
+            <span><i class="mr-1 inline-block h-3 w-3 bg-gray-200 align-middle"></i>暫停/保留</span>
+        </div>
+
+        </div><!-- /b-slots-card-body -->
+    </section>
+</div>
+
+<!-- ② 排程設定 -->
+<div class="b-panel hidden" data-panel="schedule">
+    <div class="b-panel-scroll">
+    <section class="b-card mb-6">
+        <div class="b-card-head">
+            <h2 class="b-card-title">排程設定</h2>
+        </div>
+        <div class="b-card-body">
+        <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.save_schedule') }}" id="schedule-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- 分組一:基本設定 -->
+            <fieldset class="b-fieldset">
+                <legend class="b-fieldset-legend">基本設定</legend>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                        <label class="b-label" for="sc-open-days">開放範圍(今天起)</label>
+                        <select id="sc-open-days" name="open_days" class="b-select">
+                            {% for d, lbl in [(7,'1 週'),(14,'2 週'),(30,'1 個月'),(60,'2 個月')] %}
+                            <option value="{{ d }}" {{ 'selected' if schedule.open_days==d }}>{{ lbl }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="mt-1 block text-xs text-gray-500">例:1 個月 = 今天 ~ 一個月後</small>
+                    </div>
+                    <div>
+                        <label class="b-label" for="sc-interval">出發間隔(分鐘)</label>
+                        <input type="number" id="sc-interval" name="interval_min" min="1" max="60" value="{{ schedule.interval_min }}" class="b-input">
+                    </div>
+                    <div>
+                        <label class="b-label" for="sc-capacity">每組人數</label>
+                        <input type="number" id="sc-capacity" name="capacity" min="1" max="4" value="{{ schedule.capacity }}" class="b-input">
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- 分組二:時段時間 -->
+            <fieldset class="b-fieldset">
+                <legend class="b-fieldset-legend">時段時間</legend>
+                <div id="session-rows" class="space-y-2">
+                    {% for s in schedule.sessions %}
+                    <div class="b-row-grid b-session-grid session-row">
+                        <input type="text" name="session_name" value="{{ s.name or '' }}" placeholder="名稱(例:上午場)" class="b-input">
+                        <input type="time" name="session_open" value="{{ s.open }}" required class="b-input">
+                        <span class="b-row-sep">—</span>
+                        <input type="time" name="session_close" value="{{ s.close }}" required class="b-input">
+                        <button type="button" class="remove-session b-btn b-btn-text b-btn-text-danger b-btn-sm">移除</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" id="add-session" class="mt-3 b-btn b-btn-text b-btn-sm">+ 新增時段列</button>
+            </fieldset>
+
+            <!-- 分組三:價格規則(①基本 → ②星期 → ③日期區間,由下往上覆蓋) -->
+            <fieldset class="b-fieldset">
+                <legend class="b-fieldset-legend">價格規則</legend>
+                <p class="b-price-order">取價順序:<b>③ 日期區間</b> → <b>② 星期</b> → <b>① 基本價格</b></p>
+
+                <!-- ① 基本價格 -->
+                <div class="b-price-tier">
+                    <div class="b-price-tier-label">
+                        <span class="b-price-tier-no">①</span>
+                        <span class="b-price-tier-name">基本價格</span>
+                    </div>
+                    <div class="w-full sm:w-48">
+                        <input type="number" id="sc-price" name="price" min="0" step="1" value="{{ schedule.price }}" class="b-input">
+                    </div>
+                </div>
+
+                <!-- ② 依星期價格 -->
+                <div class="b-price-tier">
+                    <div class="b-price-tier-label">
+                        <span class="b-price-tier-no">②</span>
+                        <span class="b-price-tier-name">依星期價格</span>
+                        <span class="b-price-tier-note">空白 = 用基本價</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                        {% set wd_names = ['週一','週二','週三','週四','週五','週六','週日'] %}
+                        {% for i in range(7) %}
+                        <div>
+                            <div class="mb-1 text-xs text-gray-500">{{ wd_names[i] }}</div>
+                            <input type="number" name="wd_{{ i }}" min="0" step="1"
+                                   value="{{ schedule.weekday_prices.get(i|string, '') }}" class="b-input">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- ③ 依日期區間價格 -->
+                <div class="b-price-tier">
+                    <div class="b-price-tier-label">
+                        <span class="b-price-tier-no">③</span>
+                        <span class="b-price-tier-name">依日期區間價格</span>
+                        <span class="b-price-tier-note">例:過年連假</span>
+                    </div>
+                    <div id="dateprice-rows" class="space-y-2">
+                        {% for d in schedule.date_prices %}
+                        <div class="b-row-grid b-dateprice-grid dateprice-row">
+                            <input type="date" name="dp_from" value="{{ d.from }}" class="b-input">
+                            <span class="b-row-sep">~</span>
+                            <input type="date" name="dp_to" value="{{ d.to }}" class="b-input">
+                            <input type="number" name="dp_price" value="{{ d.price }}" min="0" step="1" placeholder="價格" class="b-input">
+                            <button type="button" class="remove-dateprice b-btn b-btn-text b-btn-text-danger b-btn-sm">移除</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" id="add-dateprice" class="mt-3 b-btn b-btn-text b-btn-sm">+ 新增日期區間價格</button>
+                </div>
+            </fieldset>
+
+            <div class="mt-8 flex items-center gap-3 border-t pt-6" style="border-color: var(--border-default);">
+                <button class="b-btn b-btn-primary">儲存排程</button>
+                <p class="text-xs text-gray-500">儲存後,未來「尚未有人預約」的時段會依新規則重新產生。</p>
+            </div>
+        </form>
+        </div>
+    </section>
+
+    <!-- 暫停開放區間 -->
+    <section class="b-card">
+        <div class="b-card-head">
+            <h2 class="b-card-title">暫停開放</h2>
+        </div>
+        <div class="b-card-body">
+        <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.add_pause') }}" class="b-pause-form mb-4 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div><label class="b-label" for="pause-start">開始</label><input type="datetime-local" id="pause-start" name="start_at" required class="b-input w-auto"></div>
+            <div><label class="b-label" for="pause-end">結束</label><input type="datetime-local" id="pause-end" name="end_at" required class="b-input w-auto"></div>
+            <div><label class="b-label" for="pause-reason">原因</label><input id="pause-reason" name="reason" placeholder="原因(選填)" class="b-input w-auto"></div>
+            <button class="b-btn b-btn-text b-btn-sm">+ 新增暫停</button>
+        </form>
+        <div class="space-y-2">
+            {% for p in pauses %}
+            <div class="flex items-center gap-3 text-sm">
+                <span>{{ p.start_at }} ~ {{ p.end_at }}{% if p.reason %}（{{ p.reason }}）{% endif %}</span>
+                <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.delete_pause', pause_id=p.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="b-btn b-btn-xs b-btn-danger">刪除</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">尚無暫停區間。落在區間內的時段會自動關閉。</p>
+            {% endfor %}
+        </div>
+        </div>
+    </section>
+    </div><!-- /b-panel-scroll -->
+</div>
+
+<!-- ① 球區設定 -->
+<div class="b-panel hidden" data-panel="zones">
+    <div class="b-panel-scroll">
+    <section class="b-card">
+        <div class="b-card-head">
+            <h2 class="b-card-title">球區設定</h2>
+        </div>
+        <div class="b-card-body">
+        {# 新增球區列:頂部一條,input + 文字新增鈕 #}
+        <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.add_zone') }}" class="b-pause-form mb-5 flex items-end gap-2">
+            <div><label class="b-label" for="zone-name">球區名稱</label><input id="zone-name" name="name" required placeholder="球區名稱(例:東區)" class="b-input w-auto"></div>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="b-btn b-btn-text b-btn-sm">+ 新增球區</button>
+        </form>
+
+        {% if zones %}
+        {# 已設定球區:每個一張列項卡。名稱唯讀顯示,右側 ⋯ 動作選單(改名 inline / 刪除)。
+           改名/刪除各自沿用既有 form(action 不動)。JS = admin-slots.js 的 zone 區段。 #}
+        <div class="b-zone-caption mb-2">已設定 {{ zones|length }} 個球區</div>
+        <div id="zone-list" class="b-zone-list">
+            {% for z in zones %}
+            <div class="b-zone-item" data-zone-id="{{ z.id }}">
+                {# 唯讀名稱(平常顯示) #}
+                <span class="b-zone-name" data-zone-name>{{ z.name }}</span>
+
+                {# 改名 inline form(平常隱藏,點「改名」才顯示) #}
+                <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.update_zone', zone_id=z.id) }}" class="b-zone-edit hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input name="name" value="{{ z.name }}" class="b-input w-auto" data-zone-edit-input>
+                    <button type="submit" class="b-btn b-btn-text b-btn-sm">儲存</button>
+                    <button type="button" class="b-btn b-btn-text b-btn-sm b-zone-cancel">取消</button>
+                </form>
+
+                {# 刪除 form(由動作選單觸發 submit;刪除確認改走 admin-slots.js 的 BDialog.confirm) #}
+                <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.delete_zone', zone_id=z.id) }}" class="b-zone-del hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                </form>
+
+                {# ⋯ 動作選單觸發鈕 #}
+                <button type="button" class="b-zone-menu b-btn b-btn-icon b-btn-sm b-btn-ghost" aria-label="球區動作" aria-haspopup="true">
+                    <i data-lucide="ellipsis" aria-hidden="true"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        {# 空狀態引導:球區是時段的前置設定,做明顯引導 #}
+        <div class="b-zone-empty">
+            <span class="b-zone-empty-icon"><i data-lucide="flag" aria-hidden="true"></i></span>
+            <p class="b-zone-empty-title">尚未設定球區</p>
+            <p class="b-zone-empty-desc">球區是時段的前置設定 — 先在上方新增至少一個球區(例:東區、西區),才能在「排程設定」產生時段。</p>
+        </div>
+        {% endif %}
+        </div>
+    </section>
+    </div><!-- /b-panel-scroll -->
+</div>
+
+<!-- 時段格子彈窗(外殼開關沿用 admin-slots.js 的 hidden/flex 契約,僅升級視覺=套 .b-modal 外觀)
+     ⚠️ 不可改:#b-cell-modal、data-*-url、#bm-title、#bm-bookings、#bm-close、.bm-status-form 為 JS 契約 -->
+<div id="b-cell-modal" class="fixed inset-0 z-[1300] hidden items-center justify-center p-4"
+     style="background: rgba(0,0,0,.5);"
+     data-status-url="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.update_slot', slot_id='__SID__') }}"
+     data-booking-url="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.update_booking', booking_id='__BID__') }}"
+     data-create-url="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_b_admin.create_booking_admin') }}"
+     data-week="{{ week }}" data-date="{{ sel }}">
+    <div class="b-modal is-soft" style="max-width: 28rem;">
+        <div class="b-modal-head">
+            <div>
+                <h3 id="bm-title" class="b-modal-title" style="font-size:18px;"></h3>
+                <p id="bm-sub" class="b-modal-sub"></p>
+            </div>
+            <button type="button" id="bm-close" class="b-modal-close" aria-label="關閉">
+                <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="b-modal-body">
+            {# 內容區(看/管預約 + 新增訂單)。由指標旁動作選單決定是否進此畫面。 #}
+            <div id="bm-content">
+                <div id="bm-bookings" class="space-y-2 text-sm"></div>
+            </div>
+
+            {# 變更時段狀態面板。由動作選單決定是否進此畫面(與內容區擇一顯示)。
+               保留 .bm-status-form class + status select(JS 契約:設 action、選了即送出)。 #}
+            <div id="bm-status-panel" class="hidden">
+                <p class="mb-2 text-sm text-gray-500">選擇此時段要設定的狀態,選了立即套用:</p>
+                <form method="post" class="bm-status-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="date" value="{{ sel }}">
+                    <input type="hidden" name="week" value="{{ week }}">
+                    <select name="status" class="b-select bm-status-select" data-bdd="1">
+                        <option value="">— 選擇 —</option>
+                        <option value="open" data-tone="ok">開放</option>
+                        <option value="reserved" data-tone="neutral">保留</option>
+                        <option value="blocked" data-tone="bad">關閉</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{# SPA:admin-slots.js / admin-billing.js 已移到 base.html 殼層;此頁 extra_js 留空 #}
+{% endblock %}

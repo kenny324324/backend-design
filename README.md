@@ -11,66 +11,76 @@
 
 ```
 backend-design/
-├── demo/demo.html                  ← 元件展示頁(雙擊即開,含深色切換)
+├── demo/demo.html                  ← 元件展示頁(雙擊即開,含深色切換/換主色)
 ├── tailwind.config.snippet.js      ← Tailwind CDN runtime config(貼進 <head>)
 ├── static/
 │   ├── css/
+│   │   ├── brand.css               ← ★★ 品牌色設定檔(每個專案只改這一檔,詳見下節)
 │   │   ├── cms/b_tokens.css        ← ★ typeui design token(light+dark 全部 CSS 變數)
 │   │   ├── cms/base.css            ← 外殼版面(header / sidebar / main-content)
 │   │   ├── cms/b_admin.css         ← ★ 全部元件 + 動畫(.b-* 家族、toast、modal、flyout…)
-│   │   ├── cms/components.css      ← A 後台頁面層元件(DataTables 皮、樹狀選單、SPA modal…)
+│   │   ├── cms/components.css      ← A 後台頁面層元件(DataTables 皮、樹狀選單、wizard、bento…)
 │   │   ├── cms/login.css           ← 登入頁樣式
 │   │   └── b/dropdown.css          ← 自訂下拉(.b-dd,參數化 --dd-*)
 │   └── js/
+│       ├── tinymce-helper.js       ← TinyMCE 整合(content 編輯 modal 用)
 │       ├── b/dropdown.js           ← 下拉增強:自動把所有 <select> 包成 .b-dd(window.BDropdown)
 │       ├── b/spa.js                ← B 後台 SPA 換頁(攔連結 → fetch → 換 main + 淡入)
 │       ├── b/context-menu.js       ← 右鍵/長按 context menu(.b-ctxmenu)
 │       ├── b/filter.js             ← 篩選彈窗(.b-pop / .b-btn-filter)
 │       ├── cms/spa.js              ← A 後台 SPA 換頁(雙層 Vue app 版)
 │       ├── cms/dialogs.js          ← confirm/alert 對話框(動態 .b-modal-overlay,含淡入淡出)
-│       └── cms/scroll-fade.js      ← 捲動漸現
-└── templates/                      ← Jinja 外殼參考(含 Vue 殼層、選單、toast、深淺色/字級切換)
-    ├── cms/base.html               ← A 後台外殼(雙層 Vue app + SPA)
-    ├── cms/login.html
-    └── cms/b_admin/
-        ├── base.html               ← B 後台外殼(單 Vue app,選單帶 course_code)
-        ├── _components.html        ← Jinja macro:action_button / form_modal
-        └── login.html
+│       ├── cms/scroll-fade.js      ← 捲動漸層淡出(.is-scroll-faded)
+│       └── pages/                  ← ★ 全部後台頁面 JS(UI 渲染/互動範本)
+│           ├── b/  admin-bookings / admin-billing / admin-slots / admin-theme / checkin / manual
+│           └── cms/ index(bento 儀表板)/ booking / course / member / email-log / user /
+│                    groups / store / menu / content / course-blackout / user-profile / login
+└── templates/                      ← ★ 全部後台 Jinja 模板(各頁排版 markup + 頁內 <style> 都在)
+    ├── cms/                        ← A 模擬器後台:base(外殼)+ login + 13 頁
+    │   (index=bento 儀表板、booking/course/member/email_log/user/groups/
+    │    store/menu/content/course_blackout_manage、user_profile、manual)
+    ├── cms/b_admin/                ← B 球場後台:base(外殼)+ _components macro + login
+    │   + dashboard/bookings/billing/slots/theme/i18n/checkin/profile/manual
+    └── cms/c_admin/                ← 桿弟三頁:caddies / assignments / reviews
 ```
 
-★ = 核心兩檔。最小可用組合:`b_tokens.css + b_admin.css`(+ 想要自訂下拉就加 `dropdown.css/js`)。
+★ = 核心。最小可用組合:`brand.css + b_tokens.css + b_admin.css`(+ 想要自訂下拉就加 `dropdown.css/js`)。
+頁面模板/頁面 JS 是**完整外觀範本**:各頁版型、內聯 `<style>`、DataTables 設定、wizard、操作欄下拉等互動都在裡面,新專案照抄改資料來源即可。
+
+## ★ 品牌色:每個專案可調(static/css/brand.css)
+
+整套後台 chrome 的顏色**只有一個來源:`--b-chrome`**(在 `brand.css`)。`b_admin.css` 用 `color-mix()` 從它衍生整個 typeui brand token 家族(`--brand`/`--brand-softer`/`--brand-strong`/`--fg-brand`/`--border-brand`…),所有元件只吃 token → **換專案時改 `brand.css` 一個值,全站自動換色**,不用碰任何元件/頁面。
+
+```css
+/* static/css/brand.css — 新專案只改這三個值 */
+:root {
+  --b-primary: #173226;      /* 品牌原色(logo/前台沿用,可與 chrome 不同) */
+  --b-chrome:  #173226;      /* ★ 後台實際用色 — brand token 家族唯一來源 */
+  --b-on-primary: #ffffff;   /* brand 底上的文字色(淺主色請改深字) */
+}
+```
+
+也可以不用這檔、改成動態注入(golfmaster 真環境就是在 base.html 內聯 `<style>` 從 DB 主題設定吐值)— 只要這三個變數有定義在 `:root` 即可。demo 頁右上「換主色」就是現場改這兩個變數驗證全站跟著變。
 
 ## 快速接入(新專案)
 
 1. 整個 `static/` 照原路徑丟進專案(路徑不動,模板引用就跟 golfmaster 一致)。
-2. `<head>` 依序載入(**順序重要**:base → tokens → 元件):
+2. `<head>` 依序載入(**順序重要**:base → tokens → 元件;brand.css 放 tokens 後即可):
 
 ```html
 <link rel="stylesheet" href="/static/css/cms/base.css">
 <link rel="stylesheet" href="/static/css/cms/b_tokens.css">
+<link rel="stylesheet" href="/static/css/brand.css">      <!-- ★ 每專案改這檔換色 -->
 <link rel="stylesheet" href="/static/css/cms/b_admin.css">
 <link rel="stylesheet" href="/static/css/b/dropdown.css">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="/tailwind.config.snippet.js 的內容(內聯)"></script>
+<script>/* tailwind.config.snippet.js 的內容(內聯) */</script>
+<style>[v-cloak] { display: none !important; }</style>
 ```
 
-3. 給主色(全站 brand token 家族由這裡衍生,**只改這一個值就換色**):
-
-```html
-<style>
-:root {
-  --b-primary: #173226;      /* 品牌原色(logo 等沿用) */
-  --b-chrome:  #173226;      /* 後台 chrome 實際用色(brand token 指向這個) */
-  --b-on-primary: #ffffff;   /* brand 底上的文字色 */
-  --primary-color: var(--brand);
-  --primary-dark: var(--brand-strong);
-}
-[v-cloak] { display: none !important; }
-</style>
-```
-
-4. `<html>` 加 `data-color-mode="light"`(切 `dark` 即深色;token 兩值都已備齊)。字級三段:`data-fs="sm|lg"`(不設 = 中)。
-5. 外殼(header/sidebar/flyout/toast)直接抄 `templates/cms/b_admin/base.html`,需要 Vue 3 + lucide(CDN)。只用元件不用外殼的話,Vue/lucide 都可不裝(icon 換成任何 SVG 皆可)。
+3. `<html>` 加 `data-color-mode="light"`(切 `dark` 即深色;token 兩值都已備齊)。字級三段:`data-fs="sm|lg"`(不設 = 中)。
+4. 外殼(header/sidebar/flyout/toast)直接抄 `templates/cms/b_admin/base.html`(B 版,單 Vue app)或 `templates/cms/base.html`(A 版,雙層 app + SPA),需要 Vue 3 + lucide(CDN)。只用元件不用外殼的話,Vue/lucide 都可不裝(icon 換成任何 SVG 皆可)。
+5. 頁面照 `templates/` 對應頁當範本抄(內頁 `{% block main_modifier %}` / `page_title` / `page_actions` 的用法都在裡面),資料邏輯換成自己專案的。
 
 ## 慣例與注意
 

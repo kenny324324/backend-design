@@ -1,0 +1,1305 @@
+{% extends "cms/base.html" %}
+
+{% block title %}球場管理{% endblock %}
+{% block page_title %}球場管理{% endblock %}
+{# 照球場預約後台(b_admin/bookings):固定高框架 → 表格吃視窗剩餘高度、內滾、thead 釘住,不被推歪 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 營業時間:直向緊湊列(wizard 單步免捲動),取代原本的卡片牆 */
+/* 整步壓緊:時間輸入框高度降到 32px,讓 8 列 + 範本卡不用捲動 */
+.hours-table { --field-height: 32px; }
+.hours-table {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+    padding: 0 16px;
+}
+.hours-row {
+    display: grid;
+    grid-template-columns: 170px 1fr 1fr;
+    gap: 14px;
+    align-items: center;
+    padding: 3px 0;
+    /* 列分隔線淡化:往頁面底色混,只做輕微對齊界定 */
+    border-top: 1px solid color-mix(in srgb, var(--border-default) 55%, transparent);
+}
+.hours-row:first-child { border-top: 0; }
+.hours-row .form-label { margin: 0; }
+/* 時間輸入框:無框無底無陰影(純文字感),只在 hover / focus 才浮現框
+   ⚠️ 需 !important 壓過 b_admin.css 的 .main-content input[type="time"] 補丁層 */
+.hours-step input[type="time"] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 32px !important; min-height: 32px !important;
+    padding: 3px 8px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.hours-step input[type="time"]:hover:not(:disabled) {
+    border-color: var(--border-default-medium) !important;
+    background: var(--neutral-secondary-medium) !important;
+}
+.hours-step input[type="time"]:focus:not(:disabled) {
+    border-color: var(--border-brand) !important;
+    background: var(--neutral-primary-soft) !important;
+    box-shadow: 0 0 0 1px var(--brand) !important;
+}
+.hours-step input[type="time"]:disabled {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--fg-disabled);
+}
+.hours-row.hours-head {
+    padding: 6px 0 3px;
+    color: var(--text-body-subtle);
+    font-size: 0.82rem;
+}
+/* 異動紀錄列表:走共用 .b-modal.is-soft 外殼(淺灰底)。
+   每筆紀錄做成白底卡片浮在淺灰 modal 上 — 對齊 soft modal「白底內容區」語言。 */
+.audit-log-item {
+    padding: 14px 16px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+}
+.audit-log-item + .audit-log-item {
+    margin-top: 12px;
+}
+.audit-log-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--text-body-subtle);
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.audit-change-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.audit-change-table th,
+.audit-change-table td {
+    padding: 9px 10px;
+    border: 1px solid var(--border-default);
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+}
+.audit-change-table th {
+    background: var(--neutral-secondary-soft);
+    color: var(--text-body);
+    font-weight: 500;
+}
+.course-image-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+}
+.course-image-option {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+}
+.course-image-card {
+    position: relative;
+}
+/* 縮圖框:圓角矩形 + 淡灰邊;圖片與佔位符共用這個框 */
+.course-image-thumb {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--neutral-secondary-soft);
+    transition: border-color .15s, box-shadow .15s;
+}
+.course-image-option:hover .course-image-thumb { border-color: var(--border-default-strong); }
+.course-image-option.is-selected .course-image-thumb {
+    border-color: var(--border-brand);
+    box-shadow: 0 0 0 1px var(--border-brand);
+}
+.course-image-thumb img {
+    display: block; width: 100%; height: 100%;
+    object-fit: cover;
+}
+/* 抓不到圖時的佔位符(JS @error 換上 .is-broken → 隱藏 img、露出這層) */
+.course-image-thumb .course-image-ph {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+    color: var(--text-body-subtle); font-size: 22px;
+    background: var(--neutral-secondary-soft);
+}
+.course-image-thumb.is-broken img { display: none; }
+.course-image-thumb.is-broken .course-image-ph { display: flex; }
+.course-image-option span {
+    display: block;
+    padding: 6px 2px 0;
+    color: var(--text-body);
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* 刪除鈕:平常隱藏,hover 到該圖卡才淡入;右上角、紅色 */
+.course-image-delete {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 26px; height: 26px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--danger);
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0;
+    transform: scale(.9);
+    transition: opacity .15s, transform .15s, background .15s;
+    box-shadow: var(--shadow-sm);
+}
+.course-image-card:hover .course-image-delete { opacity: 1; transform: scale(1); }
+.course-image-delete:hover { background: var(--danger-strong, var(--danger)); }
+.course-image-delete:focus-visible { opacity: 1; transform: scale(1); outline: 2px solid #fff; outline-offset: -1px; }
+/* 封面圖片區:左=標題列+URL輸入框(吃滿剩餘寬)、右=預覽方塊(高度對齊左整組) */
+.course-cover-block {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    flex-wrap: nowrap;
+}
+.course-cover-fields {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+/* 標題列:標題靠左、「圖片來源」鈕靠右,與標題同一行 */
+.course-cover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+}
+.course-cover-head .b-pop { flex: 0 0 auto; }
+.course-cover-head .b-pop > .b-btn { white-space: nowrap; }
+.course-cover-upload-status {
+    color: var(--text-body-subtle);
+    font-size: 0.88rem;
+}
+/* 預覽方塊:貼右側、固定寬;高度靠 block 的 align-items:stretch 對齊左整組(fields),
+   底部正好齊輸入框底(fields = 標題列 + gap + 輸入框,無其他內容撐高)。 */
+.course-cover-block { align-items: stretch; }
+.course-cover-thumb {
+    position: relative;
+    flex: 0 0 auto;
+    width: 132px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--neutral-secondary-soft);
+}
+.course-cover-thumb img {
+    position: absolute; inset: 0; z-index: 1;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+}
+/* 佔位符:預設露出(沒圖時);有正常 img 會疊在上面蓋住它。圖壞了(is-broken)藏 img 再露佔位符 */
+.course-cover-thumb .course-image-ph {
+    position: absolute; inset: 0;
+    display: flex;
+    align-items: center; justify-content: center;
+    color: var(--text-body-subtle); font-size: 24px;
+    background: var(--neutral-secondary-soft);
+}
+.course-cover-thumb.is-broken img { display: none; }
+/* 清除鈕:hover 到預覽圖才淡入,右上角;非紅色(中性深色半透明底 + 白叉) */
+.course-cover-clear {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: var(--radius-full);
+    background: rgba(17, 24, 39, 0.62); color: #fff;
+    font-size: 12px; cursor: pointer;
+    opacity: 0; transform: scale(.9);
+    transition: opacity .15s, transform .15s, background .15s;
+}
+.course-cover-thumb:hover .course-cover-clear { opacity: 1; transform: scale(1); }
+.course-cover-clear:hover { background: rgba(17, 24, 39, 0.82); }
+.course-cover-clear:focus-visible { opacity: 1; transform: scale(1); outline: 2px solid #fff; outline-offset: -1px; }
+
+/* 預設營業:獨立範本卡(來源),與下方每週表分層 */
+/* 範本卡:與下方每週表 .hours-table 完全相同的框/圓角/底色/padding,不做特殊處理,
+   卡內 .hours-row 用同一 170px 1fr 1fr 網格與 padding → 欄位與列高皆對齊 */
+.hours-default-card {
+    padding: 0 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+}
+.hours-default-card .hours-row { border-top: 0; }
+
+/* 每週設定標題列:小標左、套用按鈕右 */
+.hours-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    margin: 14px 0 6px;
+}
+
+/* 區塊小標:分隔「預設範本」與「每週設定」 */
+.hours-section-label {
+    margin: 0;
+    font-size: 0.82rem; font-weight: 600;
+    color: var(--text-body-subtle);
+    text-transform: none;
+}
+
+/* 純文字按鈕:淺色文字,hover 亮起(變品牌色) */
+.hours-apply-btn {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none; box-shadow: none;
+    padding: 4px 6px; border-radius: var(--radius-sm);
+    color: var(--text-body-subtle); font-weight: 600; font-size: 0.9rem;
+    cursor: pointer; transition: color .15s;
+}
+.hours-apply-btn:hover { color: var(--brand); }
+.hours-apply-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* danger 變體:移除鈕,hover 才轉紅 */
+.hours-apply-btn.is-danger:hover { color: var(--danger); }
+
+/* 關閉窗口摘要列:固定欄位網格對齊(日期 / 時段 / 原因 / 狀態 / 動作) */
+.blackout-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.4fr) 90px 1fr 72px 64px;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid color-mix(in srgb, var(--border-default) 55%, transparent);
+    font-size: 0.9rem; color: var(--text-heading);
+}
+/* 表頭:固定在框外,下方有分隔線;內滾區第一列不再重複畫上緣線 */
+.blackout-head {
+    padding: 6px 0 6px;
+    color: var(--text-body-subtle); font-size: 0.82rem;
+    border-top: 0;
+    border-bottom: 1px solid var(--border-default);
+}
+.blackout-scroll .blackout-row:first-child { border-top: 0; }
+.blackout-time { color: var(--text-body-subtle); }
+.blackout-reason {
+    color: var(--text-body);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.blackout-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+
+/* 這步:section → 表格 一路 flex column。
+   ⚠️ 用 max-height:100% 不用 height:100% —— 內容少時貼合內容(不撐滿 body 留白);
+   內容多到超過 body 可用高時才被限高,觸發內滾區捲動。 */
+.hours-step-fill { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+.hours-step-fill .blackout-table {
+    display: flex; flex-direction: column; min-height: 0; flex: 0 1 auto;
+}
+/* 資料列內滾區:
+   flex: 0 1 auto → 內容少時高度=內容(不撐開留白);
+   內容多到超過剩餘空間時,被 flex 收縮 + min-height:0 壓住 → 才開始框內捲動。
+   一般捲動(對齊其他表格,不隱藏 scrollbar)。 */
+.blackout-scroll { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+
+/* ── 球場列表各欄對齊 ──
+   ⚠️ DataTables scrollY:表頭是獨立 table(.dataTables_scrollHead)、內容在 .dataTables_scrollBody,
+   className(num/col-center/col-actions)會同時套到表頭 th 與內容 td → 選擇器不綁 .b-tbl,兩邊都吃 → 表頭對齊內容。
+   名稱靠左(維持);洞數/平日/假日 數字靠右;可預約/現場付款 badge + 排序 置中;操作靠右。 */
+.course-tbl th.num,
+.course-tbl td.num { text-align: right; }
+.course-tbl th.col-center,
+.course-tbl td.col-center { text-align: center; }
+.course-tbl th.col-actions,
+.course-tbl td.col-actions { text-align: right; }   /* 操作:標題與內容(按鈕/下拉)都靠右對齊 */
+/* 「操作」標題右移,對齊下方「操作 ⌄」觸發器裡的「操作」文字(而非箭頭)。
+   欄位 td/th 左右內距 16px;觸發器內文字尾端再進 = 觸發器右內距 6px + 箭頭 10px + 文字↔箭頭間距 6px = 22px。
+   → 標題右內距 = 16 + 22 = 38px,讓標題「操作」與下方「操作」文字對齊。 */
+.course-tbl th.col-actions { padding-right: 38px; }
+/* col-center 同時有 .num(排序)時,置中優先於靠右 */
+.course-tbl th.num.col-center,
+.course-tbl td.num.col-center { text-align: center; }
+/* 操作欄內的平鋪按鈕/下拉靠右對齊 */
+.course-tbl .col-actions-flat { justify-content: flex-end; }
+
+/* ── 操作欄 RWD:寬螢幕平鋪四按鈕 / 窄螢幕收成「操作 ▾」下拉 ──
+   ⚠️ 寬螢幕:平鋪顯示、下拉容器 .b-actions-dd 徹底 display:none(連同觸發器一起藏,不再同時出現)。
+   開合由 JS 切 .is-open;menu 用 opacity+transform+visibility transition → 開與收都有動畫。 */
+.col-actions-flat { display: inline-flex; gap: 2px; flex-wrap: nowrap; }
+.b-actions-dd { display: none; position: relative; }   /* 預設(寬)完全不顯示下拉 */
+
+/* 「操作 ▾」觸發器(<button>) */
+.b-actions-dd-trigger {
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 6px; border: 0; background: none;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-body-subtle); white-space: nowrap;
+    transition: color .15s;
+}
+.b-actions-dd-trigger:hover,
+.b-actions-dd.is-open .b-actions-dd-trigger { color: var(--brand); }
+.b-actions-dd-trigger .fa-chevron-down { font-size: 10px; transition: transform .2s; }
+.b-actions-dd.is-open .b-actions-dd-trigger .fa-chevron-down { transform: rotate(180deg); }
+
+/* 選單:對齊共用下拉 .b-dd-menu 視覺(白底、細框、shadow、item 樣式);
+   開合動畫:預設隱藏(opacity 0 + 上移 + visibility hidden),.is-open 時淡入下滑。收起時反向過場。 */
+.b-actions-dd-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 1200;
+    min-width: 148px; padding: 4px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    transform-origin: top right;
+    opacity: 0; visibility: hidden; transform: translateY(-6px);
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+.b-actions-dd.is-open .b-actions-dd-menu {
+    opacity: 1; visibility: visible; transform: translateY(0);
+}
+/* 選項:統一左對齊、同 padding、同圓角;顏色沿用 .action-btn 語意色(edit/add/disable) */
+.b-actions-dd-menu .action-btn {
+    display: flex; align-items: center; gap: 8px;
+    justify-content: flex-start; width: 100%;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+.b-actions-dd-menu .action-btn i { width: 16px; text-align: center; }   /* 圖示等寬對齊 */
+/* 摺疊選單內:報到(第一項)與其餘操作之間的淡分隔線 */
+.b-actions-dd-menu .b-actions-dd-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: color-mix(in srgb, var(--border-default) 60%, transparent);
+}
+
+/* 斷點:窄於 1100px 時才改用下拉版(空間夠時平鋪、完全不出現下拉) */
+@media (max-width: 1100px) {
+    .col-actions-flat { display: none; }
+    .b-actions-dd { display: inline-block; }
+}
+
+/* ── 捲動漸層淡出:套在任何會捲動的容器(modal body 等)────────────────
+   上下邊緣以 mask 漸層淡出取代硬截斷;隱藏 scrollbar。
+   .at-top / .at-bottom 由 scroll-fade.js 依捲動位置切換:
+   已到頂 → 不淡上緣;已到底 → 不淡下緣(避免假截斷)。 */
+.is-scroll-faded {
+    /* 預設上下都淡(內容超出、且未到頂未到底時) */
+    --fade-size: 24px;
+    -webkit-mask-image: linear-gradient(to bottom,
+        transparent 0, #000 var(--fade-size),
+        #000 calc(100% - var(--fade-size)), transparent 100%);
+    mask-image: linear-gradient(to bottom,
+        transparent 0, #000 var(--fade-size),
+        #000 calc(100% - var(--fade-size)), transparent 100%);
+    scrollbar-width: none;          /* Firefox 隱藏 scrollbar */
+}
+.is-scroll-faded::-webkit-scrollbar { width: 0; height: 0; display: none; }  /* WebKit 隱藏 scrollbar */
+/* 到頂:上緣不淡(只淡下) */
+.is-scroll-faded.at-top {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade-size)), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade-size)), transparent 100%);
+}
+/* 到底:下緣不淡(只淡上) */
+.is-scroll-faded.at-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-size));
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-size));
+}
+/* 同時到頂又到底(內容沒超出、不需捲):完全不淡 */
+.is-scroll-faded.at-top.at-bottom {
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
+/* ── 預約狀況 modal:照抄預約管理(統計條 + 預約表 + 詳細子 modal)── */
+/* modal 固定高佈局:head/統計固定,表格區吃剩餘高內滾 */
+.b-modal.cbk-modal {
+    width: 1080px; max-width: calc(100vw - 48px);
+    height: min(760px, calc(100vh - 48px));
+    display: flex; flex-direction: column;
+}
+.b-modal.cbk-modal .cbk-body {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: 16px 24px 20px;
+}
+.cbk-tbl-scroll { flex: 0 1 auto; min-height: 0; }
+/* 表頭釘住(modal 內滾) */
+.cbk-tbl-scroll table.dataTable > thead > tr > th,
+.cbk-tbl-scroll .b-tbl thead th {
+    position: sticky !important; top: 0 !important; z-index: 3;
+    background: var(--neutral-secondary-soft);
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 欄位對齊:付款/預約狀態/時數 居中,金額靠右,操作表頭靠左 */
+#courseBookingsTable th.col-center, #courseBookingsTable td.col-center { text-align: center; }
+#courseBookingsTable th.col-actions { text-align: left; }
+#courseBookingsTable td.col-actions { white-space: nowrap; }
+
+/* 精簡統計條(同預約管理) */
+.cbk-body .booking-stat-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px 22px;
+    padding: 12px 18px; margin-bottom: 14px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-xs);
+    flex: 0 0 auto;
+}
+.cbk-body .booking-stat { display: inline-flex; align-items: baseline; gap: 8px; }
+.cbk-body .booking-stat-label { color: var(--text-body-subtle); font-size: 13px; font-weight: 500; }
+.cbk-body .booking-stat-value {
+    color: var(--text-heading); font-size: 20px;
+    font-weight: var(--b-font-metric, 600);
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.cbk-body .booking-stat-sep { width: 1px; align-self: stretch; min-height: 20px; background: var(--border-default); margin: 0 2px; }
+
+/* 詳細子 modal:分區資訊 */
+.bd-section-title {
+    font-size: 13px; font-weight: 600; color: var(--text-heading);
+    margin: 18px 0 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-default);
+}
+.bd-section-title:first-child { margin-top: 0; }
+.bd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+.bd-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bd-label { font-size: 12px; color: var(--text-body-subtle); }
+.bd-value { font-size: 14px; color: var(--text-heading); word-break: break-all; }
+.bd-note {
+    font-size: 14px; color: var(--text-body);
+    background: var(--neutral-secondary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); padding: 10px 12px; white-space: pre-wrap;
+}
+
+/* ── 報到掃描器 modal(從預約管理搬來;掃描是綁球場的動作,改由球場管理該列觸發)── */
+.checkin-scanner-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 360px) 1fr;
+    gap: 16px;
+}
+/* 固定高度:開/關掃描時 modal 高度不跳動(相機 video 依 object-fit 填滿此框,不撐高)*/
+.checkin-video-wrap {
+    position: relative;
+    overflow: hidden;
+    height: 260px;
+    border: 1px solid var(--border-default-strong);
+    border-radius: var(--radius-md);
+    background: var(--dark-strong);
+}
+.checkin-video-wrap video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.checkin-video-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 500;
+}
+.checkin-scan-frame {
+    position: absolute;
+    inset: 44px;
+    border: 2px solid var(--success);
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.42);
+    pointer-events: none;
+}
+.checkin-result {
+    min-height: 200px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-secondary-soft);
+    padding: 16px;
+}
+.checkin-result.success {
+    border-color: var(--border-success-subtle);
+    background: var(--success-soft);
+}
+.checkin-result.error {
+    border-color: var(--border-danger-subtle);
+    background: var(--danger-soft);
+}
+.checkin-result-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-body-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.checkin-result-detail {
+    margin-top: 14px;
+    display: grid;
+    gap: 8px;
+    color: var(--text-body);
+}
+@media (max-width: 760px) {
+    .checkin-scanner-grid { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block page_subtitle %}<p class="page-subtitle">管理前台顯示的球場名稱、洞數、每小時價格、介紹與是否開放預約。</p>{% endblock %}
+
+{% block page_actions %}
+{# iOS 風搜尋框:驅動 DataTables server-side search(後端吃 search[value],搜名稱/地點/slug) #}
+<div class="a-search">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+           placeholder="搜尋球場" aria-label="搜尋球場">
+    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+        <i class="fa-solid fa-circle-xmark"></i>
+    </button>
+</div>
+<button @click="openAddForm" class="b-btn b-btn-primary">
+    <i class="fa-solid fa-plus"></i>
+    新增球場
+</button>
+{% endblock %}
+
+{% block content %}
+{# 照球場預約後台(b_admin/bookings)結構:.b-tbl-scroll 當 .main-content 直接子項,
+   配合 is-fixed-h → 吃視窗剩餘高度、內滾、thead sticky(b_admin.css),表格不被推歪。
+   ⚠️ DataTables 不再用 scrollY(與 is-fixed-h 打架),改由 .b-tbl-scroll 接管內滾。 #}
+<div class="b-tbl-scroll course-tbl" data-filter-target>
+    <table id="courseTable" class="b-tbl" style="width: 100%;">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div>
+    <div>
+
+        {# 異動紀錄 modal:走共用 .b-modal 元件(標題/關閉鈕/內距對齊其他 modal),同樣走 Vue transition 淡入淡出 #}
+        <transition name="b-modal-fade">
+        <div v-if="showAuditLog" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeAuditLog">
+            {# is-soft:對齊新增/編輯球場 modal — 淺灰底、標題列無分隔線 #}
+            <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="auditModalTitle" style="max-width: 920px;">
+                <div class="b-modal-head">
+                    <div>
+                        <h2 id="auditModalTitle" class="b-modal-title">球場異動紀錄</h2>
+                        <p class="b-modal-sub">[[ auditCourseName ]]</p>
+                    </div>
+                    <button type="button" class="b-modal-close" @click="closeAuditLog" aria-label="關閉">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="b-modal-body is-scroll-faded" style="max-height:min(620px,72vh); overflow-y:auto;">
+                    <div v-if="auditLoading" style="padding:8px 0; color:var(--text-body-subtle);">載入中...</div>
+                    <div v-else-if="!auditLogs.length" style="padding:8px 0; color:var(--text-body-subtle);">目前沒有異動紀錄。</div>
+                    <div v-else>
+                        <div v-for="log in auditLogs" :key="log.id" class="audit-log-item">
+                            <div class="audit-log-meta">
+                                <strong>[[ operationLabel(log.operation) ]]</strong>
+                                <span>操作人：[[ log.user || 'unknown' ]]</span>
+                                <span>時間：[[ log.created_at ]]</span>
+                            </div>
+                            <table class="audit-change-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 22%;">項目</th>
+                                        <th>修改前</th>
+                                        <th>修改後</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="change in log.summary" :key="`${log.id}-${change.field}`">
+                                        <td>[[ change.label ]]</td>
+                                        <td>[[ change.old ]]</td>
+                                        <td>[[ change.new ]]</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+    </div>
+
+    <!-- 新增/編輯:分段輸入 wizard modal(Vue 驅動;固定高度、逐步填寫,目標單步免捲動) -->
+    {# 開/關淡入淡出交給 Vue transition(關閉會等過場結束才隱藏);data-modal-anim="vue" 讓 base 觀察器跳過開場重播 #}
+    <transition name="b-modal-fade">
+    <div v-show="showForm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="requestClose">
+        {# is-soft:對齊球場預約的表單 modal;is-wizard:分段步驟框架(components.css) #}
+        <div class="b-modal is-soft is-wizard" role="dialog" aria-modal="true" style="max-width: 860px;">
+            <div class="b-modal-head">
+                <h2 class="b-modal-title">[[ isEdit ? '編輯球場' : '新增球場' ]]</h2>
+                <button type="button" class="b-modal-close" @click="requestClose" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            {# 步驟列:膠囊 + 連線 stepper。hourly 5 步 / teetime 2 步;到過的步驟可點回,還沒到的鎖住。
+               連線 = .b-steps-track/.b-steps-fill(progressPct 填充,切步平滑滑動);膠囊本身即節點,不放數字。
+               ⚠️ 不可用 <template v-for>:SPA Vue 編譯會剝 <template> → 步驟列整條消失,v-for 直接掛 button。 #}
+            <div class="b-steps" :style="{ '--steps': wizardSteps.length }" aria-label="填寫步驟">
+                <div class="b-steps-track" aria-hidden="true">
+                    <div class="b-steps-fill" :style="{ width: progressPct + '%' }"></div>
+                </div>
+                <button v-for="(step, i) in wizardSteps" :key="step.key"
+                        type="button" class="b-step"
+                        :class="{ 'is-active': i === currentStep, 'is-done': i < currentStep }"
+                        :disabled="!canGoToStep(i)"
+                        :aria-current="i === currentStep ? 'step' : null"
+                        @click="goToStep(i)">
+                    <span class="b-step-label">[[ step.label ]]</span>
+                </button>
+            </div>
+
+            {# Enter 送出 = 非最後一步走「下一步」,最後一步才真的送出 #}
+            <form @submit.prevent="onFormSubmit">
+                <div class="b-modal-body is-scroll-faded" ref="wizardBody">
+                {# 步驟切換滑動過場:mode=out-in 避免固定高度框架內兩步重疊;方向由 slideName 決定(前進左滑/後退右滑)
+                   after-enter:v-if 重建 DOM 後重新增強本步 <select>(否則下拉退回原生) #}
+                <transition :name="slideName" mode="out-in" @after-enter="onStepEntered">
+                    {# ── 步驟:基本資料 ── #}
+                    <section v-if="currentStepKey === 'basic'" key="basic">
+                        <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px;">
+                            <div class="form-group">
+                                <label class="form-label">球場名稱 <span style="color: var(--danger-color);">*</span></label>
+                                <input type="text" v-model="formData.name" :class="['form-input', errors.name ? 'error' : '']" placeholder="例如：湖景高爾夫球場">
+                                <p v-if="errors.name" class="form-error">[[ errors.name ]]</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">地點</label>
+                                <input type="text" v-model="formData.location" class="form-input" placeholder="例如：桃園市龍潭區">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">洞數</label>
+                                <input type="number" v-model.number="formData.holes" min="1" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">排序</label>
+                                <input type="number" v-model.number="formData.sort" min="0" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">預約模式</label>
+                                <select v-model="formData.product_type" class="form-input" :disabled="!!formData.id">
+                                    <option value="hourly">小時制</option>
+                                    <option value="teetime">tee time(真實球場)</option>
+                                </select>
+                                <small style="color:var(--text-body-subtle);">tee time 建立後會自動產生對應後台租戶,儲存後不可變更。</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">狀態</label>
+                                <select v-model="formData.status" class="form-input">
+                                    <option value="active">啟用</option>
+                                    <option value="inactive">停用</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label class="form-label">網址代稱(slug)</label>
+                                <input type="text" v-model="formData.slug" class="form-input" placeholder="例如:tasheegolf(留空則由名稱自動產生)">
+                                <small style="color:var(--text-body-subtle);">前台 /b/&lt;代稱&gt;/、後台 /cms/&lt;代稱&gt;/ 用到;僅英數與「-」,會自動正規化並確保唯一。</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    {# ── 步驟:價格與付款(teetime 時只有付款開關) ── #}
+                    <section v-else-if="currentStepKey === 'pricing'" key="pricing">
+                        <template v-if="formData.product_type !== 'teetime'">
+                            <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 20px;">
+                                <div class="form-group">
+                                    <label class="form-label">計價模式</label>
+                                    <select v-model="formData.pricing_mode" class="form-input">
+                                        <option value="hourly">小時制(每小時計價)</option>
+                                        <option value="session">場次制(整場次計價)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group" v-if="formData.pricing_mode !== 'session'">
+                                    <label class="form-label">平日每小時價格</label>
+                                    <input type="number" v-model.number="formData.weekday_price" min="0" step="0.01" class="form-input">
+                                </div>
+
+                                <div class="form-group" v-if="formData.pricing_mode !== 'session'">
+                                    <label class="form-label">假日每小時價格</label>
+                                    <input type="number" v-model.number="formData.holiday_price" min="0" step="0.01" class="form-input">
+                                </div>
+                            </div>
+
+                            <div v-if="formData.pricing_mode === 'session'" style="margin-top: 6px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+                                    <h3 class="section-title" style="margin:0;">場次設定</h3>
+                                    <button type="button" @click="addSession" class="b-btn">
+                                        <i class="fa-solid fa-plus"></i>
+                                        新增場次
+                                    </button>
+                                </div>
+                                <p style="color:var(--text-body-subtle); font-size:0.88rem; margin-bottom:14px;">
+                                    前台會以「場次 ∩ 當天營業時間」顯示,超出營業時間的部分自動裁掉(例如晚場 15:00–17:30、營業到 17:00 → 顯示 15:00–17:00);場次之間的空檔不開放。
+                                </p>
+                                <div v-for="(s, index) in formData.sessions" :key="index"
+                                     style="display:grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:10px;">
+                                    <div><label class="form-label">名稱</label><input type="text" v-model="s.name" class="form-input" placeholder="早場"></div>
+                                    <div><label class="form-label">開始</label><input type="time" v-model="s.start_time" class="form-input"></div>
+                                    <div><label class="form-label">結束</label><input type="time" v-model="s.end_time" class="form-input"></div>
+                                    <div><label class="form-label">平日價</label><input type="number" v-model.number="s.weekday_price" min="0" step="0.01" class="form-input"></div>
+                                    <div><label class="form-label">假日價</label><input type="number" v-model.number="s.holiday_price" min="0" step="0.01" class="form-input"></div>
+                                    <button type="button" @click="removeSession(index)" class="b-btn" style="color:var(--fg-danger);" title="刪除場次">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                                <p v-if="!formData.sessions || !formData.sessions.length" style="color:var(--fg-disabled); font-size:0.9rem;">尚未新增場次,請點「新增場次」。</p>
+                                <p v-if="errors.sessions" class="form-error">[[ errors.sessions ]]</p>
+                            </div>
+
+                            <div style="margin: 20px 0 16px; border-top: 1px solid var(--border-default);"></div>
+                        </template>
+
+                        <div class="form-group">
+                            <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" class="b-check" v-model="formData.is_bookable">
+                                開放前台預約
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" class="b-check" v-model="formData.allow_onsite_payment">
+                                開放現場付款
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" class="b-check" v-model="formData.allow_newebpay">
+                                開放藍新支付(線上付款)
+                            </label>
+                            <p style="margin-top: 6px; color: var(--text-body-subtle); font-size: 0.88rem;">
+                                前台預約的付款方式依此兩個開關決定:勾選「藍新支付」才會出現線上付款、勾選「現場付款」才會出現現場付款。
+                            </p>
+                        </div>
+                    </section>
+
+                    {# ── 步驟:圖片與介紹(僅 hourly) ── #}
+                    <section v-else-if="currentStepKey === 'content'" key="content">
+                        {# 封面圖片:左=標題列(標題 + 圖片來源鈕)+ URL 輸入框;右=預覽/佔位符(高度對齊左整組) #}
+                        <div class="form-group course-cover-block">
+                            <div class="course-cover-fields">
+                                <div class="course-cover-head">
+                                    <label class="form-label" style="margin:0;">封面圖片 URL</label>
+                                    <div class="b-pop" :class="{ 'is-open': imageMenuOpen }">
+                                        <button type="button" class="b-btn b-btn-text b-btn-sm" @click.stop="toggleImageMenu" :disabled="imageUploadLoading" aria-haspopup="menu" :aria-expanded="imageMenuOpen">
+                                            <i :class="imageUploadLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-image'"></i>
+                                            圖片來源
+                                            <i class="fa-solid fa-chevron-down b-pop-caret"></i>
+                                        </button>
+                                        <div class="b-menu align-right" role="menu">
+                                            <button type="button" class="b-menu-item" role="menuitem" @click="pickUpload">
+                                                <i class="fa-solid fa-cloud-arrow-up"></i>上傳圖片
+                                            </button>
+                                            <button type="button" class="b-menu-item" role="menuitem" @click="pickLibrary">
+                                                <i class="fa-solid fa-images"></i>從檔案庫選擇
+                                            </button>
+                                            {# 清除已移到預覽圖上(hover 右上角叉叉),菜單不再放 #}
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="text" v-model="formData.cover_image" class="form-input" placeholder="https://...">
+                            </div>
+                            {# 預覽方塊:有圖顯示圖、沒圖顯示佔位符;圓角淡灰邊(同檔案庫縮圖);高度對齊左整組(底部齊輸入框底) #}
+                            <div class="course-cover-thumb" :class="{ 'is-broken': coverBroken }">
+                                <img v-if="formData.cover_image" :src="formData.cover_image" alt="封面預覽" @error="coverBroken = true" @load="coverBroken = false">
+                                <div class="course-image-ph" aria-hidden="true">
+                                    <i class="fa-solid fa-image"></i>
+                                </div>
+                                {# 有圖時:hover 到預覽圖,右上角出現叉叉清除(非紅色) #}
+                                <button v-if="formData.cover_image" type="button" class="course-cover-clear" title="清除圖片" aria-label="清除圖片" @click="clearCoverImage">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <input ref="courseCoverInput" class="js-course-cover-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;" @change="onCourseCoverSelect($event)">
+                        </div>
+                        <div v-if="imageUploadLoading" class="course-cover-upload-status" style="margin-top:6px;">圖片上傳中 [[ imageUploadProgress ]]%</div>
+
+                        <div class="form-group">
+                            <label class="form-label">球場介紹</label>
+                            <textarea v-model="formData.description" class="form-input" rows="3" placeholder="輸入球場特色、環境介紹與適合族群。"></textarea>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px;">
+                            <div class="form-group">
+                                <label class="form-label">球場特色</label>
+                                <textarea v-model="formData.features" class="form-input" rows="3" placeholder="例如：山景球道、練習場、餐廳、停車場。"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">預約注意事項</label>
+                                <textarea v-model="formData.booking_notice" class="form-input" rows="3" placeholder="例如：請於開球前 30 分鐘完成報到。"></textarea>
+                            </div>
+                        </div>
+                    </section>
+
+                    {# ── 步驟:營業時間(僅 hourly) ── #}
+                    <section v-else-if="currentStepKey === 'hours'" key="hours" class="hours-step">
+                        <p style="margin:0 0 14px; color:var(--text-body-subtle); font-size:0.88rem;">先設好「預設營業」時間,一鍵套用到每週;再針對個別日子微調。</p>
+
+                        {# 預設營業:獨立範本卡(來源),卡內用與每週表相同網格對齊 #}
+                        <div class="hours-default-card">
+                            <div class="hours-row">
+                                <label class="form-label" style="display:flex; align-items:center; gap:10px; font-weight:600; margin:0;">
+                                    <input type="checkbox" class="b-check" v-model="formData.default_hours.is_open">
+                                    預設營業
+                                </label>
+                                <input type="time" v-model="formData.default_hours.open_time" class="form-input" :disabled="!formData.default_hours.is_open" aria-label="預設開門時間">
+                                <input type="time" v-model="formData.default_hours.close_time" class="form-input" :disabled="!formData.default_hours.is_open" aria-label="預設關門時間">
+                            </div>
+                        </div>
+                        <p v-if="errors.default_hours" class="form-error" style="margin-top:8px;">[[ errors.default_hours ]]</p>
+
+                        {# 每週設定:實際每天(套用目標);標題右側放套用按鈕 #}
+                        <div class="hours-section-head">
+                            <p class="hours-section-label">每週設定</p>
+                            <button type="button" @click="applyDefaultHours" class="hours-apply-btn">
+                                <i class="fa-solid fa-copy"></i>
+                                套用預設
+                            </button>
+                        </div>
+                        <div class="hours-table">
+                            <div class="hours-row hours-head" aria-hidden="true">
+                                <span></span>
+                                <span>開門時間</span>
+                                <span>關門時間</span>
+                            </div>
+                            <div v-for="item in formData.weekly_hours" :key="item.weekday" class="hours-row">
+                                <label class="form-label" style="display:flex; align-items:center; gap:10px;">
+                                    <input type="checkbox" class="b-check" v-model="item.is_open">
+                                    [[ weekdays[item.weekday] ]]
+                                </label>
+                                <input type="time" v-model="item.open_time" class="form-input" :disabled="!item.is_open" :aria-label="weekdays[item.weekday] + ' 開門時間'">
+                                <input type="time" v-model="item.close_time" class="form-input" :disabled="!item.is_open" :aria-label="weekdays[item.weekday] + ' 關門時間'">
+                            </div>
+                        </div>
+                        <p v-if="errors.weekly_hours" class="form-error" style="margin-top:8px;">[[ errors.weekly_hours ]]</p>
+                    </section>
+
+                    {# ── 步驟:關閉預約窗口(僅 hourly);flll 填滿 modal 主體,列表在框內滾不超出按鈕列 ── #}
+                    <section v-else-if="currentStepKey === 'blackout'" key="blackout" class="hours-step-fill">
+                        <div class="hours-section-head" style="margin-top:0;">
+                            <p style="margin:0; color:var(--text-body-subtle); font-size:0.88rem;">整修、公休日或活動期間,可在這裡暫停前台預約。</p>
+                            <button type="button" @click="openBlackoutModal()" class="hours-apply-btn">
+                                <i class="fa-solid fa-plus"></i>
+                                新增窗口
+                            </button>
+                        </div>
+
+                        <div v-if="!formData.blackout_windows.length" style="padding:16px; border:1px dashed var(--border-default-strong); border-radius: var(--radius-md); color:var(--text-body-subtle);">
+                            目前沒有額外關閉預約窗口。
+                        </div>
+
+                        {# 摘要列:固定欄位網格對齊;表頭固定,資料列超出時區塊內滾(漸層淡出) #}
+                        <div v-else class="hours-table blackout-table">
+                            <div class="blackout-row blackout-head" aria-hidden="true">
+                                <span>日期範圍</span>
+                                <span>時段</span>
+                                <span>原因</span>
+                                <span>狀態</span>
+                                <span></span>
+                            </div>
+                            <div class="blackout-scroll">
+                                <div v-for="(item, index) in formData.blackout_windows" :key="index" class="blackout-row">
+                                    <span class="num">[[ item.start_date ]] – [[ item.end_date ]]</span>
+                                    <span class="blackout-time">[[ item.is_all_day ? '全天' : (item.start_time + '–' + item.end_time) ]]</span>
+                                    <span class="blackout-reason">[[ item.reason || '—' ]]</span>
+                                    <span><span class="b-badge" :class="item.status === 'active' ? 'ok' : 'neutral'"><span class="dot"></span>[[ item.status === 'active' ? '生效' : '暫停' ]]</span></span>
+                                    <span class="blackout-row-actions">
+                                        <button type="button" @click="openBlackoutModal(index)" class="hours-apply-btn" aria-label="編輯窗口">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button type="button" @click="removeBlackoutWindow(index)" class="hours-apply-btn is-danger" aria-label="移除窗口">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-if="errors.blackout_windows" class="form-error" style="margin-top:8px;">[[ errors.blackout_windows ]]</p>
+                    </section>
+                </transition>
+                </div>
+                <div class="b-modal-foot">
+                    {# 依球場預約後台規範:標題列已有 ✕ 不放「取消」;前進/送出鈕 = b-btn-text(同 B 的 form_modal macro) #}
+                    <button type="button" v-if="currentStep > 0" class="b-btn b-btn-quiet" @click="prevStep" style="margin-right:auto;">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        上一步
+                    </button>
+                    <button v-if="currentStep < wizardSteps.length - 1" type="button" class="b-btn b-btn-text"
+                            :disabled="currentStepBlocked" @click="nextStep">
+                        <span>下一步</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <button v-else type="submit" :disabled="isSubmitting" class="b-btn b-btn-text">
+                        <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                        <span>[[ isEdit ? '儲存修改' : '建立球場' ]]</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </transition>
+
+    {# 檔案庫選圖:獨立 modal(疊在 wizard modal 之上);圓角淡灰邊縮圖、抓不到圖顯示佔位符、hover 顯示紅色刪除鈕 #}
+    <transition name="b-modal-fade">
+    <div v-show="showImageLibraryModal" class="b-modal-overlay is-visible is-open" style="z-index:1400;" data-modal-vue data-modal-anim="vue" @click.self="closeImageLibraryModal">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="imgLibTitle" style="max-width: 720px;">
+            <div class="b-modal-head">
+                <h2 id="imgLibTitle" class="b-modal-title">從檔案庫選擇圖片</h2>
+                <button type="button" class="b-modal-close" @click="closeImageLibraryModal" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="b-modal-body is-scroll-faded" style="max-height:min(560px,70vh); overflow-y:auto;">
+                <div v-if="imageOptionsLoading" style="padding:32px 0; text-align:center; color:var(--text-body-subtle);">
+                    <i class="fa-solid fa-spinner fa-spin"></i> 載入圖片庫...
+                </div>
+                <div v-else-if="imageOptionsLoaded && !imageOptions.length" style="padding:32px 0; text-align:center; color:var(--text-body-subtle);">
+                    目前沒有可選用的圖片。
+                </div>
+                <div v-else-if="imageOptions.length" class="course-image-picker">
+                    <div v-for="image in imageOptions" :key="image.id" class="course-image-card">
+                        <button type="button"
+                                :class="['course-image-option', formData.cover_image === image.url ? 'is-selected' : '']"
+                                @click="selectCoverImageAndClose(image)">
+                            <span class="course-image-thumb">
+                                <img :src="image.url" :alt="image.name || 'Course image'" @error="onThumbError($event)" @load="onThumbLoad($event)">
+                                <span class="course-image-ph" aria-hidden="true">
+                                    <i class="fa-solid fa-image"></i>
+                                </span>
+                            </span>
+                            <span :title="image.name">[[ image.name || image.file_path ]]</span>
+                        </button>
+                        <button v-if="image.can_delete" type="button" class="course-image-delete"
+                                title="刪除圖片" aria-label="刪除圖片" @click.stop="deleteCourseImage(image)">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </transition>
+
+    {# 關閉預約窗口:新增/編輯 modal(疊在 wizard modal 之上);樣式對齊圖片庫 modal(.b-modal.is-soft) #}
+    <transition name="b-modal-fade">
+    <div v-show="showBlackoutModal" class="b-modal-overlay is-visible is-open" style="z-index:1400;" data-modal-vue data-modal-anim="vue" @click.self="closeBlackoutModal">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle" style="max-width: 560px;">
+            <div class="b-modal-head">
+                <h2 id="blackoutModalTitle" class="b-modal-title">[[ blackoutEditIndex === null ? '新增關閉窗口' : '編輯關閉窗口' ]]</h2>
+                <button type="button" class="b-modal-close" @click="closeBlackoutModal" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="b-modal-body is-scroll-faded" style="max-height:min(560px,70vh); overflow-y:auto;">
+                <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:14px;">
+                    <div>
+                        <label class="form-label">開始日期</label>
+                        <input type="date" v-model="blackoutDraft.start_date" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">結束日期</label>
+                        <input type="date" v-model="blackoutDraft.end_date" class="form-input">
+                    </div>
+                </div>
+                <div style="margin-top:14px;">
+                    <label class="form-label">原因</label>
+                    <input type="text" v-model="blackoutDraft.reason" class="form-input" placeholder="整修、公休日、活動">
+                </div>
+                <div style="margin-top:14px;">
+                    <label class="form-label">狀態</label>
+                    <select v-model="blackoutDraft.status" class="form-input">
+                        <option value="active">生效</option>
+                        <option value="inactive">暫停</option>
+                    </select>
+                </div>
+                <label class="form-label" style="display:flex; align-items:center; gap:10px; margin-top:16px;">
+                    <input type="checkbox" class="b-check" v-model="blackoutDraft.is_all_day">
+                    全天關閉
+                </label>
+                <div v-if="!blackoutDraft.is_all_day" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:14px; margin-top:14px;">
+                    <div>
+                        <label class="form-label">開始時間</label>
+                        <input type="time" v-model="blackoutDraft.start_time" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">結束時間</label>
+                        <input type="time" v-model="blackoutDraft.end_time" class="form-input">
+                    </div>
+                </div>
+                <p v-if="blackoutModalError" class="form-error" style="margin-top:12px;">[[ blackoutModalError ]]</p>
+            </div>
+            <div class="b-modal-foot">
+                <button type="button" class="b-btn b-btn-text" @click="saveBlackoutModal">
+                    <span>[[ blackoutEditIndex === null ? '新增' : '儲存' ]]</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    </transition>
+
+    {# 關閉確認:自訂 modal(取代瀏覽器 confirm),樣式對齊 .b-modal;有未儲存進度才跳 #}
+    <transition name="b-modal-fade">
+    <div v-show="showCloseConfirm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="cancelClose">
+        <div class="b-modal is-alert" role="alertdialog" aria-modal="true" aria-labelledby="closeConfirmTitle">
+            <div class="b-alert-body">
+                <div class="b-alert-icon b-alert-icon-danger" aria-hidden="true">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2 id="closeConfirmTitle" class="b-alert-title">要放棄這次填寫嗎?</h2>
+                <p class="b-alert-desc">你還沒完成[[ isEdit ? '這次修改' : '新增球場' ]],現在關閉不會儲存進度。</p>
+            </div>
+            <div class="b-alert-foot">
+                <button type="button" class="b-btn b-btn-quiet" @click="cancelClose">繼續填寫</button>
+                <button type="button" class="b-btn b-btn-text b-btn-text-danger" @click="confirmClose">放棄並關閉</button>
+            </div>
+        </div>
+    </div>
+    </transition>
+
+    {# 預約狀況 modal:照抄預約管理(統計條 + 搜尋/篩選 + 預約表 + 詳細子 modal)。
+       差別 = 該球場鎖定 → 篩選面板不給選球場;資料走既有 /booking_manage/{list,stats} #}
+    <transition name="b-modal-fade">
+    <div v-if="showCourseBookings" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeCourseBookings">
+        <div class="b-modal is-soft cbk-modal" role="dialog" aria-modal="true" aria-labelledby="cbkTitle">
+            <div class="b-modal-head">
+                <div>
+                    <h2 id="cbkTitle" class="b-modal-title">預約狀況</h2>
+                    <p class="b-modal-sub">[[ bookingsCourseName ]]</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    {# 搜尋框(對齊球場管理) #}
+                    <div class="a-search">
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        <input type="search" v-model.trim="bookingsTableSearch" @input="onBookingsSearch"
+                               placeholder="搜尋預約 / 會員 / 編號" aria-label="搜尋預約">
+                        <button type="button" v-show="bookingsTableSearch" class="a-search-clear" @click="clearBookingsSearch" aria-label="清除搜尋">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </button>
+                    </div>
+                    {# 篩選(不給選球場——球場已鎖定) #}
+                    <div class="b-pop">
+                        <button type="button" class="b-btn b-btn-filter" data-pop aria-expanded="false" @click="enhanceBookingsFilters">
+                            <i class="fa-solid fa-filter"></i>篩選<i class="fa-solid fa-chevron-down b-pop-caret"></i>
+                        </button>
+                        <div class="b-pop-panel">
+                            <p class="b-pop-panel-title">篩選條件</p>
+                            <div class="form-group">
+                                <label class="b-label">開始日期</label>
+                                <input type="date" v-model="bookingsFilters.start_date" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="b-label">結束日期</label>
+                                <input type="date" v-model="bookingsFilters.end_date" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="b-label">預約狀態</label>
+                                <select v-model="bookingsFilters.status" class="form-input">
+                                    <option value="">全部狀態</option>
+                                    <option value="pending">待確認</option>
+                                    <option value="confirmed">已確認</option>
+                                    <option value="checked_in">已報到</option>
+                                    <option value="pending_cancel">待取消</option>
+                                    <option value="cancelled">已取消</option>
+                                    <option value="completed">已完成</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="b-label">付款狀態</label>
+                                <select v-model="bookingsFilters.payment_status" class="form-input">
+                                    <option value="">全部付款狀態</option>
+                                    <option value="unpaid">未付款</option>
+                                    <option value="onsite">現場付款</option>
+                                    <option value="pending">付款中</option>
+                                    <option value="paid">已付款</option>
+                                    <option value="refunded">已退款</option>
+                                    <option value="failed">付款失敗</option>
+                                </select>
+                            </div>
+                            <div class="b-pop-foot">
+                                <button type="button" class="b-btn-reset" @click="resetBookingsFilters" data-pop-close>重置</button>
+                                <button type="button" class="b-btn b-btn-primary b-btn-sm" @click="reloadBookings" data-pop-close>套用</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="b-modal-close" @click="closeCourseBookings" aria-label="關閉">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="b-modal-body cbk-body">
+                {# 精簡統計條(照抄預約管理) #}
+                <div class="booking-stat-bar">
+                    <div class="booking-stat"><span class="booking-stat-label">總預約</span><span class="booking-stat-value num">[[ bookingsStats.total_bookings ]]</span></div>
+                    <div class="booking-stat"><span class="booking-stat-label">總金額</span><span class="booking-stat-value num" style="color:var(--fg-success);">[[ formatBookingCurrency(bookingsStats.total_amount) ]]</span></div>
+                    <div class="booking-stat"><span class="booking-stat-label">總時數</span><span class="booking-stat-value num" style="color:var(--fg-brand);">[[ formatBookingHours(bookingsStats.total_duration_hours) ]]</span></div>
+                    <div class="booking-stat-sep"></div>
+                    <div class="booking-stat"><span class="booking-stat-label">待確認</span><span class="booking-stat-value num" style="color:var(--fg-warning);">[[ bookingsStats.pending_count ]]</span></div>
+                    <div class="booking-stat"><span class="booking-stat-label">已確認</span><span class="booking-stat-value num" style="color:var(--fg-success);">[[ bookingsStats.confirmed_count ]]</span></div>
+                    <div class="booking-stat"><span class="booking-stat-label">待取消</span><span class="booking-stat-value num" style="color:var(--fg-danger);">[[ bookingsStats.pending_cancel_count ]]</span></div>
+                    <div class="booking-stat"><span class="booking-stat-label">已取消</span><span class="booking-stat-value num" style="color:var(--fg-danger);">[[ bookingsStats.cancelled_count ]]</span></div>
+                </div>
+
+                {# 表格(內滾、thead sticky) #}
+                <div class="b-tbl-scroll cbk-tbl-scroll">
+                    <table id="courseBookingsTable" class="b-tbl" style="width:100%;">
+                        <thead><tr></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    </transition>
+
+    {# 預約詳細子 modal(照抄預約管理;疊在預約 modal 之上)#}
+    <transition name="b-modal-fade">
+    <div v-if="showBookingDetail" class="b-modal-overlay is-visible is-open" style="z-index:1500;" data-modal-vue data-modal-anim="vue" @click.self="closeBookingDetail">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="cbkDetailTitle" style="max-width: 680px;">
+            <div class="b-modal-head">
+                <div>
+                    <h2 id="cbkDetailTitle" class="b-modal-title">預約詳細資訊</h2>
+                    <p class="b-modal-sub" v-if="bookingDetail">[[ bookingDetail.booking_no ]]</p>
+                </div>
+                <button type="button" class="b-modal-close" @click="closeBookingDetail" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="b-modal-body is-scroll-faded" style="max-height:min(620px,72vh); overflow-y:auto;">
+                <div v-if="bookingDetail">
+                    <div class="bd-section-title">預約資訊</div>
+                    <div class="bd-grid">
+                        <div class="bd-item"><span class="bd-label">預約編號</span><span class="bd-value">[[ bookingDetail.booking_no || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">球場</span><span class="bd-value">[[ bookingDetail.course_name || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">日期</span><span class="bd-value">[[ bookingDetail.play_date || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">時段</span><span class="bd-value">[[ String(bookingDetail.start_time||'').slice(0,5) ]] - [[ String(bookingDetail.end_time||'').slice(0,5) ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">時數</span><span class="bd-value">[[ bookingDetail.duration_hours || 1 ]] 小時</span></div>
+                        <div class="bd-item"><span class="bd-label">預約狀態</span><span class="bd-value" v-html="renderBookingStatusBadge(bookingDetail.status)"></span></div>
+                        <div class="bd-item"><span class="bd-label">建立時間</span><span class="bd-value">[[ bookingDetail.created_at || '-' ]]</span></div>
+                    </div>
+                    <div class="bd-section-title">會員與聯絡</div>
+                    <div class="bd-grid">
+                        <div class="bd-item"><span class="bd-label">會員</span><span class="bd-value">[[ bookingDetail.member_name || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">Email</span><span class="bd-value">[[ bookingDetail.member_email || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">電話</span><span class="bd-value">[[ bookingDetail.member_phone || '-' ]]</span></div>
+                    </div>
+                    <div class="bd-section-title">付款資訊</div>
+                    <div class="bd-grid">
+                        <div class="bd-item"><span class="bd-label">付款狀態</span><span class="bd-value" v-html="renderPaymentStatusBadge(bookingDetail.payment_status, bookingDetail)"></span></div>
+                        <div class="bd-item"><span class="bd-label">每小時價</span><span class="bd-value">$[[ Number(bookingDetail.hourly_price||0).toLocaleString() ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">總金額</span><span class="bd-value" style="color:var(--fg-success);font-weight:600;">$[[ Number(bookingDetail.total_price||0).toLocaleString() ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">付款方式</span><span class="bd-value">[[ bookingDetail.payment_provider || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">商店訂單號</span><span class="bd-value">[[ bookingDetail.payment_merchant_order_no || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">交易號</span><span class="bd-value">[[ bookingDetail.payment_trade_no || '-' ]]</span></div>
+                        <div class="bd-item"><span class="bd-label">付款時間</span><span class="bd-value">[[ bookingDetail.paid_at || '-' ]]</span></div>
+                        <div class="bd-item" v-if="bookingDetail.payment_error_message"><span class="bd-label">付款錯誤</span><span class="bd-value" style="color:var(--fg-danger);">[[ bookingDetail.payment_error_message ]]</span></div>
+                    </div>
+                    <div v-if="bookingDetail.note">
+                        <div class="bd-section-title">備註</div>
+                        <div class="bd-note">[[ bookingDetail.note ]]</div>
+                    </div>
+                </div>
+                <div v-else style="padding:24px 0;color:var(--text-body-subtle);">找不到這筆預約資料。</div>
+            </div>
+        </div>
+    </div>
+    </transition>
+
+    {# 報到掃描 modal:掃描報到 QR 是綁球場的動作,改由球場管理該列「報到」鈕觸發;沿用 .b-modal.is-soft + Vue transition #}
+    <transition name="b-modal-fade">
+    <div v-if="showCheckinScanner" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeCheckinScanner">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" aria-labelledby="checkinModalTitle" style="max-width: 860px;">
+            <div class="b-modal-head">
+                <div>
+                    <h2 id="checkinModalTitle" class="b-modal-title">報到掃描</h2>
+                    <p class="b-modal-sub">[[ checkinCourseName ]]</p>
+                </div>
+                <button type="button" class="b-modal-close" @click="closeCheckinScanner" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="b-modal-body" style="padding: 20px 24px 24px;">
+                <p style="color:var(--text-body-subtle);margin-bottom:16px;font-size:14px;">
+                    掃描會員的報到 QR Code,通過時間與付款檢查後會更新為已報到。
+                </p>
+                <div class="checkin-scanner-grid">
+                    <div>
+                        <div class="checkin-video-wrap">
+                            <video class="js-checkin-video" autoplay muted playsinline></video>
+                            <div class="checkin-scan-frame" v-if="scanner.active"></div>
+                            <div v-if="!scanner.active" class="checkin-video-placeholder">掃描器未開啟</div>
+                        </div>
+                        <div style="margin-top:10px;color:var(--text-body-subtle);font-size:0.85rem;">
+                            <span v-if="scanner.supported && scanner.secureContext">請允許瀏覽器使用相機,將 QR Code 對準綠色框線。</span>
+                            <span v-else-if="!scanner.secureContext">Chrome 需要 HTTPS 才能使用相機,請改用 https:// 網址開啟後台。</span>
+                            <span v-else>此瀏覽器不支援相機存取,請改用新版 Chrome 或 Edge。</span>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <button v-if="!scanner.active" @click="startCheckinScanner" class="b-btn b-btn-primary">
+                                <i class="fa-solid fa-qrcode"></i> 開啟掃描
+                            </button>
+                            <button v-else @click="stopCheckinScanner" class="b-btn b-btn-ghost">
+                                <i class="fa-solid fa-stop"></i> 停止掃描
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="checkin-result" :class="{ success: scanner.result && scanner.result.success, error: scanner.result && !scanner.result.success }">
+                        <div class="checkin-result-label">掃描結果</div>
+                        <div v-if="scanner.processing" style="margin-top:16px;color:var(--text-body);font-weight:500;">報到處理中...</div>
+                        <div v-else-if="scanner.result" style="margin-top:14px;">
+                            <div :style="{ color: scanner.result.success ? 'var(--fg-success-strong)' : 'var(--fg-danger-strong)', fontSize: '1.1rem', fontWeight: 500 }">
+                                [[ scanner.result.message ]]
+                            </div>
+                            <div v-if="scanner.result.data" class="checkin-result-detail">
+                                <div><strong>預約編號:</strong>[[ scanner.result.data.booking_no ]]</div>
+                                <div><strong>會員:</strong>[[ scanner.result.data.member_name ]]</div>
+                                <div><strong>球場:</strong>[[ scanner.result.data.course_name ]]</div>
+                                <div><strong>時段:</strong>[[ scanner.result.data.play_date ]] [[ String(scanner.result.data.start_time || '').slice(0, 5) ]]</div>
+                                <div><strong>狀態:</strong><span v-html="renderCheckinStatus(scanner.result.data.status)"></span></div>
+                            </div>
+                        </div>
+                        <div v-else style="margin-top:16px;color:var(--text-body-subtle);">尚未掃描 QR Code。</div>
+                        <div v-if="scanner.error" style="margin-top:12px;color:var(--fg-danger);font-weight:500;">[[ scanner.error ]]</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </transition>
+</div>
+{% endblock %}

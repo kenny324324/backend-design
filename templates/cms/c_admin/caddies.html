@@ -1,0 +1,111 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}桿弟管理{% endblock %}
+{% block page_title %}桿弟管理{% endblock %}
+{% set status_labels = {'active':'在職','leave':'請假','coaching':'受訓中','suspended':'停權','inactive':'停用'} %}
+{% set assignment_labels = {'assigned':'已指派','playing':'打擊中','completed':'閒置中','changed':'已更換','cancelled':'已取消'} %}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block page_actions %}
+<!-- 右上「+ 新增桿弟」→ 開 modal -->
+<button type="button" class="b-btn b-btn-primary" data-modal-open="caddie-add-modal">
+    <i data-lucide="plus" aria-hidden="true"></i><span>新增桿弟</span>
+</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- 新增桿弟 modal -->
+<div class="b-modal-overlay" id="caddie-add-modal" role="dialog" aria-modal="true" aria-labelledby="caddie-add-title">
+    <div class="b-modal is-soft is-wide">
+        <div class="b-modal-head">
+            <h2 class="b-modal-title" id="caddie-add-title">新增桿弟</h2>
+            <button type="button" class="b-modal-close" data-modal-close aria-label="關閉">
+                <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+        </div>
+        <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_c_admin.caddies') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="b-modal-body grid grid-cols-2 gap-3">
+                <label class="b-label">姓名 *<input name="name" required placeholder="輸入姓名" class="b-input"></label>
+                <label class="b-label">電話<input name="phone" placeholder="選填" class="b-input"></label>
+                <label class="b-label col-span-2">專長標籤<input name="skill_tags" placeholder="逗號分隔" class="b-input"></label>
+                <label class="b-label">到職日<input type="date" name="joined_at" class="b-input"></label>
+                <label class="b-label">狀態
+                    <select name="status" class="b-select">
+                        {% for s in statuses %}<option value="{{ s }}">{{ status_labels[s] }}</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="b-modal-foot">
+                <button class="b-btn b-btn-text" data-require-fill disabled>新增</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 桿弟列表(內滾:吃視窗剩餘高度、thead 釘住) -->
+<div class="b-tbl-scroll">
+    <table class="b-tbl">
+        <thead>
+            <tr>
+                <th class="px-3 py-2">姓名</th><th class="px-3 py-2">電話</th>
+                <th class="px-3 py-2">專長</th><th class="px-3 py-2">到職</th>
+                <th class="px-3 py-2">評鑑數</th><th class="px-3 py-2">平均分</th>
+                <th class="px-3 py-2">低分</th><th class="px-3 py-2">預約狀態</th>
+                <th class="px-3 py-2">人員狀態</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in caddies %}
+            <tr class="border-t">
+                <td class="px-3 py-2 font-semibold">{{ c.name }}</td>
+                <td class="px-3 py-2">{{ c.phone or '—' }}</td>
+                <td class="px-3 py-2">{{ c.skill_tags or '—' }}</td>
+                <td class="px-3 py-2">{{ c.joined_at or '—' }}</td>
+                <td class="px-3 py-2">
+                    {% if c.review_count %}
+                    <a href="{{ url_for('cms_c_admin.reviews', caddie_id=c.id) }}" class="b-text-primary font-semibold underline">{{ c.review_count }}</a>
+                    {% else %}0{% endif %}
+                </td>
+                <td class="px-3 py-2 font-bold {{ 'text-red-600' if c.avg_score and c.avg_score < 3 else ('text-green-600' if c.avg_score else '') }}">
+                    {{ '%.2f'|format(c.avg_score) if c.avg_score is not none else '—' }}
+                </td>
+                <td class="px-3 py-2">{% if c.low_count %}<span class="text-red-600 font-semibold">{{ c.low_count }}</span>{% else %}0{% endif %}</td>
+                <td class="px-3 py-2">
+                    {% if c.active_assignment %}
+                    <div class="mb-1 text-xs text-gray-600">
+                        {{ c.active_assignment.play_date }} {{ c.active_assignment.tee_time }}
+                        {% if c.active_assignment.locked_until %} / 鎖定至 {{ c.active_assignment.locked_until }}{% endif %}
+                        <div>{{ c.active_assignment.booking_code or c.active_assignment.group_name or '—' }}</div>
+                    </div>
+                    <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_c_admin.assignment_status', aid=c.active_assignment.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="date" value="{{ c.active_assignment.play_date }}">
+                        <input type="hidden" name="back" value="caddies">
+                        <select name="status" onchange="this.form.submit()" class="border px-2 py-1 text-xs">
+                            {% for s in assignment_statuses %}<option value="{{ s }}" {{ 'selected' if c.active_assignment.status==s }}>{{ assignment_labels[s] }}</option>{% endfor %}
+                        </select>
+                    </form>
+                    {% else %}
+                    <span class="b-badge ok"><span class="dot"></span>閒置中</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-2">
+                    <form method="post" action="{{ preview_noop_action if preview_noop_action is defined else url_for('cms_c_admin.caddie_status', cad_id=c.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <select name="status" onchange="this.form.submit()" class="border px-2 py-1 text-xs">
+                            {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if c.status==s }}>{{ status_labels[s] }}</option>{% endfor %}
+                        </select>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">尚無桿弟,請先新增。</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}

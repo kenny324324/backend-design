@@ -1,0 +1,102 @@
+{% extends "cms/b_admin/base.html" %}
+{% block title %}前台主題{% endblock %}
+{% block page_title %}前台主題設定{% endblock %}
+{% block main_modifier %}is-fixed-h is-theme-fixed{% endblock %}
+{% block content %}
+{% set fonts = [
+    ("'Noto Sans TC', system-ui, sans-serif", '黑體(預設)'),
+    ("'Noto Serif TC', serif", '明體(典雅)'),
+    ("'Noto Sans TC', 'Microsoft JhengHei', sans-serif", '正黑體')
+] %}
+<div class="b-theme-grid"
+     data-course-name="{{ g.course.name }}"
+     data-holes="{{ g.course.holes }}">
+
+    <!-- 左欄:設定表單(細長) -->
+    <section class="b-card b-theme-form">
+        <div class="b-card-head"><h2 class="b-card-title">外觀設定</h2></div>
+        <form method="post" action="{{ url_for('cms_b_admin.theme') }}" class="b-theme-form-body">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- 可捲動的欄位區 -->
+            <div class="b-theme-fields">
+                <!-- Logo(選完檔案即自動上傳;按鈕在標題同一行右側) -->
+                <div class="b-img-upload {{ 'is-empty' if not theme.logo_url }}" data-url="{{ url_for('cms_b_admin.theme_upload') }}">
+                    <div class="b-field-head">
+                        <span class="b-label b-field-title">Logo 圖片</span>
+                        <input type="file" id="tp-logo-file" accept="image/jpeg,image/png,image/webp,image/gif" class="b-img-file b-file-input">
+                        <label for="tp-logo-file" class="b-file-btn b-btn b-btn-text b-btn-sm">
+                            <i data-lucide="upload" aria-hidden="true"></i><span data-file-name>選擇並上傳</span>
+                        </label>
+                    </div>
+                    <input type="hidden" name="logo_url" value="{{ theme.logo_url or '' }}" class="b-img-val">
+                    <div class="b-img-frame b-theme-logo-frame">
+                        <img class="b-img-preview b-theme-logo-thumb"
+                             src="{{ theme.logo_url or '' }}" {% if not theme.logo_url %}style="display:none"{% endif %} alt="">
+                        <span class="b-img-empty"><i data-lucide="image" aria-hidden="true"></i>尚未上傳 Logo</span>
+                    </div>
+                </div>
+
+                <!-- 首頁大圖 -->
+                <div class="b-img-upload {{ 'is-empty' if not theme.hero_image }}" data-url="{{ url_for('cms_b_admin.theme_upload') }}">
+                    <div class="b-field-head">
+                        <span class="b-label b-field-title">首頁大圖</span>
+                        <input type="file" id="tp-hero-file" accept="image/jpeg,image/png,image/webp,image/gif" class="b-img-file b-file-input">
+                        <label for="tp-hero-file" class="b-file-btn b-btn b-btn-text b-btn-sm">
+                            <i data-lucide="upload" aria-hidden="true"></i><span data-file-name>選擇並上傳</span>
+                        </label>
+                    </div>
+                    <input type="hidden" name="hero_image" value="{{ theme.hero_image or '' }}" class="b-img-val">
+                    <div class="b-img-frame b-theme-hero-frame">
+                        <img class="b-img-preview b-theme-hero-thumb"
+                             src="{{ theme.hero_image or '' }}" {% if not theme.hero_image %}style="display:none"{% endif %} alt="">
+                        <span class="b-img-empty"><i data-lucide="image" aria-hidden="true"></i>尚未上傳大圖</span>
+                    </div>
+                </div>
+
+                <label class="b-label b-field-title">主色
+                    <input type="color" name="primary_color" value="{{ theme.primary_color or '#173226' }}" class="b-color">
+                </label>
+                <label class="b-label b-field-title">點綴色
+                    <input type="color" name="accent_color" value="{{ theme.accent_color or '#b8975a' }}" class="b-color">
+                </label>
+                <label class="b-label b-field-title">字型
+                    <select name="font_family" class="b-select">
+                        {% for val, lbl in fonts %}
+                        <option value="{{ val }}" {{ 'selected' if theme.font_family==val }}>{{ lbl }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="b-label b-field-title">首頁文案
+                    <textarea name="hero_copy" rows="4" class="b-textarea" placeholder="顯示在首頁大圖上的一句話">{{ theme.hero_copy or '' }}</textarea>
+                </label>
+            </div>
+
+            <!-- 固定在底部的儲存區 -->
+            <div class="b-theme-foot">
+                <button class="b-btn b-btn-primary b-btn-block">
+                    <i data-lucide="save" aria-hidden="true"></i><span>儲存</span>
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- 右欄:真實前台首頁即時預覽(iframe 嵌真前台,改欄位即時套未存值) -->
+    <section class="b-card b-theme-preview-card">
+        <div class="b-card-head">
+            <h2 class="b-card-title">前台預覽</h2>
+        </div>
+        <div class="b-card-body">
+            <div class="b-theme-preview" id="b-theme-preview">
+                <iframe class="b-theme-frame" id="b-theme-frame" title="前台預覽"
+                        src="{{ preview_links.get('front_home') if preview_links is defined else url_for('b_booking.index') }}"></iframe>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# SPA:admin-theme.js 已移到 base.html 殼層;此頁 extra_js 留空 #}
+{% endblock %}

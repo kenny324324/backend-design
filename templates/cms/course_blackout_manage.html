@@ -1,0 +1,865 @@
+{% extends "cms/base.html" %}
+
+{% block title %}暫停營業管理{% endblock %}
+{% block page_title %}暫停營業管理{% endblock %}
+{# 整頁固定高:左日曆 / 右表格並排,兩欄各自內滾,body 不滾。對齊球場管理/預約管理的 is-fixed-h 模型 #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── 左日曆 / 右表格 並排(固定高、各自內滾)────────────────────────
+   .blackout-split 當 .main-content.is-fixed-h 的伸展子項(吃剩餘高);
+   內部兩欄各自 min-height:0 + overflow:auto → body 永不出現外層捲軸。 */
+/* ⚠️ 必須用 .main-content.is-fixed-h > 前綴拉高特異度,壓過 b_admin.css 的
+   `.main-content.is-fixed-h > :not(.b-tbl-scroll){flex:0 0 auto}`(否則 .blackout-split
+   會被固定成 0 0 auto → 撐到內容高、被 overflow:hidden 裁掉、兩欄不內滾)。
+   同 form.is-fixed-h-form 的既有做法。 */
+.main-content.is-fixed-h > .blackout-split {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
+    gap: 16px;
+    align-items: stretch;
+}
+.blackout-col {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xs);
+    /* ⚠️ 不用 overflow:hidden —— 否則清單頭部的篩選 .b-pop-panel 下拉會被裁掉。
+       圓角裁切改由 body 自己的 overflow:auto 負責(頭部下拉得以溢出欄外)。 */
+}
+/* 頭部允許下拉溢出欄外(篩選面板) */
+.blackout-col > .blackout-col-head { position: relative; z-index: 5; }
+/* 標題區:兩欄同高(固定高度),讓左右「標題帶」對齊 */
+.blackout-col-head {
+    flex: 0 0 auto;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-default);
+}
+.blackout-col-title {
+    color: var(--text-heading);
+    font-size: 15px;
+    font-weight: var(--b-font-metric, 600);
+    white-space: nowrap;
+}
+.blackout-col-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+}
+/* 月曆欄(非 is-flush):月視圖寬度剛好塞滿,永不水平捲動(只允許垂直內滾) */
+.blackout-col-body:not(.is-flush) { overflow-x: hidden; }
+/* 表格欄:body 不留 padding,表格直接貼容器邊(使用者要求;寬表允許水平捲動) */
+.blackout-col-body.is-flush { padding: 0; }
+/* 空狀態撐滿欄高、置中(取代 DataTables 有框線的 zeroRecords 列) */
+.blackout-col-body .blackout-empty { flex: 1 1 auto; padding: 40px 24px; }
+/* 右欄表格:去掉 .b-tbl-scroll 自己的框(改吃 .blackout-col 的框),thead sticky 釘在欄頂 */
+.blackout-col-body .b-tbl-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;              /* 捲動已交給 .blackout-col-body */
+}
+/* 表頭區:表格 thead 對齊左欄「星期列」(同灰底、同高度),讓左右「表頭帶」對齊 */
+.blackout-col-body .b-tbl-scroll table.dataTable > thead > tr > th,
+.blackout-col-body .b-tbl-scroll .b-tbl thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3;
+    height: 37px;                    /* = 星期列高度(padding 8+8 + 行高)對齊 */
+    padding-top: 0;
+    padding-bottom: 0;
+    background: var(--neutral-tertiary);
+    color: var(--text-body);
+    font-weight: 600;
+    box-shadow: inset 0 -1px 0 var(--border-default);
+}
+/* 狀態欄置中(表頭 + 內容),對齊其他列表頁 */
+.blackout-col-body table.dataTable th.col-center,
+.blackout-col-body table.dataTable td.col-center { text-align: center; }
+/* 清單頭部工具列:搜尋(左)+ 篩選(右) */
+.blackout-list-tools { display: flex; align-items: center; gap: 8px; }
+/* 欄頭列的搜尋框:窄欄用的小尺寸 .a-search(不吃滿寬) */
+.a-search.a-search-sm { max-width: 200px; }
+@media (max-width: 1180px) {
+    .a-search.a-search-sm { max-width: 150px; }
+}
+/* 窄一點的桌機:表格欄可再收窄,但仍維持並排(後台桌機 only,不做手機堆疊) */
+@media (max-width: 1180px) {
+    .blackout-split { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); }
+}
+
+/* ── 月曆:Google Calendar 風方格(貼齊欄邊、無圓角、共用細格線、格間無間距)────── */
+.blackout-calendar-head,
+.blackout-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0;                          /* 格間無間距,靠共用格線分隔 */
+}
+/* 星期列 = 較深色的標題欄(貼齊欄邊、底線分隔) */
+.blackout-calendar-head {
+    margin: 0;
+    flex: 0 0 auto;
+    background: var(--neutral-tertiary);
+    color: var(--text-body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid var(--border-default);
+}
+.blackout-calendar-head > div { padding: 8px 0; }
+.blackout-calendar-head > div + div { border-left: 1px solid var(--border-default); }
+/* 切月不抖動:格線包一層 relative,loading 只淡化格線 + 疊 spinner,不抽換 DOM → 高度穩定。
+   ★ 撐滿欄高:wrap 吃剩餘高、grid 也 100% 高,列用 auto-rows:1fr 平均拉高 → 不留大片空白。
+   ★ 貼齊欄邊:grid 只補上邊線(左右貼欄邊、無外圓角);每格補下/右線 → 內部線只畫一次。 */
+.blackout-cal-wrap { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.blackout-cal-wrap > .blackout-calendar-grid {
+    flex: 1 1 auto;
+    grid-auto-rows: minmax(64px, 1fr);
+    border-left: 1px solid var(--border-default);
+}
+.blackout-calendar-grid.is-loading { opacity: 0.45; transition: opacity .12s; pointer-events: none; }
+.blackout-cal-spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-brand);
+    font-size: 1.4rem;
+}
+/* Google Calendar 風方格:無圓角、只補下/右格線(與 grid 上/左外框拼成完整網格)。
+   暫停=淡紅底 + 左紅條;鎖定=灰淡不可點;今天=日期數字圈藍。 */
+/* 空白格:單純 border 分隔線即可(內無 meta 灰底) */
+.blackout-cal-blank {
+    border-right: 1px solid var(--border-default);
+    border-bottom: 1px solid var(--border-default);
+}
+.blackout-day {
+    position: relative;
+    padding: 6px 7px;
+    background: var(--neutral-primary-soft);
+    border-bottom: 1px solid var(--border-default);
+    text-align: left;
+    cursor: pointer;
+    transition: background .12s;
+    display: flex;
+    flex-direction: column;
+}
+/* 右側日期分隔線用 ::after 畫在最上層(z-index 高)→ 底部 meta 灰底貼滿也壓不過它。
+   right:0 畫在格子內側右緣(不用 -1px,避免最右欄超出容器 1px → 水平捲動)。 */
+.blackout-day::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--border-default);
+    z-index: 4;
+    pointer-events: none;
+}
+.blackout-cal-blank { background: var(--neutral-secondary-soft); }
+.blackout-day:hover { background: var(--neutral-tertiary); }
+/* 暫停營業:整格淡紅底 + 左側紅條 */
+.blackout-day.is-closed { background: var(--danger-soft); }
+.blackout-day.is-closed:hover { background: color-mix(in srgb, var(--danger-soft) 80%, var(--danger)); }
+.blackout-day.is-closed::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--danger);
+}
+.blackout-day.is-locked {
+    background: var(--neutral-secondary-soft);
+    color: var(--fg-disabled);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.blackout-day.is-locked:hover { background: var(--neutral-secondary-soft); }
+.blackout-day.is-locked::before { display: none; }
+.blackout-day.is-locked .blackout-day-number { color: var(--fg-disabled); }
+/* 頂列:日期數字(左)+ 今天/暫停標(右) */
+.blackout-day-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+.blackout-day-number {
+    font-size: 0.9rem;
+    font-weight: var(--b-font-metric, 600);
+    color: var(--text-heading);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.blackout-day.is-closed .blackout-day-number { color: var(--fg-danger-strong); }
+/* 今天:日期數字圈藍圓底(Google Calendar 風) */
+/* 今天:品牌色圓底,數字在圈內真正置中(單位數=正圓;兩位數=膠囊,靠 min-width+左右小 padding 撐開;
+   上下 margin 對稱抵銷 line-height,flex 置中才不偏移) */
+.blackout-day.is-today .blackout-day-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    margin: -2px 0 -2px -2px;
+    padding: 0 4px;
+    border-radius: var(--radius-full);
+    background: var(--brand);
+    color: var(--b-on-primary, #fff);
+    line-height: 1;
+    box-sizing: border-box;
+}
+.blackout-day-today { display: none; }   /* 今天改用圈藍數字表示,不再另放文字標 */
+/* 可預約 / 不可預約 badge(pill):放頂列右側,與日期同一行 */
+.blackout-day-status {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: var(--success-soft);
+    color: var(--fg-success-strong);
+    border: 1px solid var(--border-success-subtle);
+    font-size: 0.66rem;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.blackout-day-status.closed {
+    background: var(--danger-soft);
+    color: var(--fg-danger-strong);
+    border-color: var(--border-danger-subtle);
+}
+/* 暫停原因:中段,自然撐開把 meta 推到底 */
+.blackout-day-reason {
+    margin-top: 4px;
+    color: var(--fg-danger-strong);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* 底部 meta 區塊:淺灰底 + 上分隔線。
+   ⚠️ 不用左右負 margin(會蓋到格子 border-right 格線,使日期間分隔線變色/消失)——
+   底色只在格子 padding 內,左右保留 padding 讓格線完整露出;只往下貼到格底(margin-bottom 抵 padding-bottom)。
+   每列 標籤靠左、數值靠右;margin-top:auto 推到格底。 */
+/* 灰底左右貼滿到格子邊緣(負 margin 抵格子 6/7 padding)。
+   分隔線交給格子的 ::after 畫在最上層(見 .blackout-day::after),灰底貼滿也壓不過格線。 */
+.blackout-day-meta {
+    margin: auto -7px -6px;
+    padding: 5px 7px;
+    background: var(--neutral-secondary-soft);
+    border-top: 1px solid var(--border-default);
+    color: var(--text-body-subtle);
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+.blackout-day-metarow { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.blackout-day-metarow + .blackout-day-metarow { margin-top: 1px; }
+.blackout-day-metarow .bm-label { color: var(--text-body-subtle); white-space: nowrap; }
+.blackout-day-metarow .bm-value { color: var(--text-body); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.blackout-day.is-closed .blackout-day-meta { background: color-mix(in srgb, var(--danger-soft) 55%, transparent); }
+
+/* ── 日曆頭部:月份大標(左) · 月份切換(正中) · 球場下拉(右)──
+   三欄 grid 讓切換真正置中(不受左右寬度影響)。 */
+.blackout-cal-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; width: 100%; }
+.blackout-cal-title {
+    justify-self: start;
+    color: var(--text-heading);
+    font-size: 20px;
+    font-weight: var(--b-font-metric, 700);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.blackout-cal-nav { display: flex; gap: 6px; align-items: center; justify-self: center; }
+.blackout-cal-course { min-width: 0; justify-self: end; }
+.blackout-cal-course .form-input { max-width: 200px; }
+
+/* ── 新增/編輯暫停 modal:固定尺寸,本體不因球場/全天切換變高變寬 ── */
+.blackout-form-modal {
+    max-width: min(720px, 94vw);
+    height: min(600px, calc(100vh - 48px));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.blackout-form-modal > .b-modal-head,
+.blackout-form-modal > .b-modal-foot { flex: 0 0 auto; }
+.blackout-form-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+.blackout-form {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.blackout-form-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+.blackout-form-main {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.blackout-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+.blackout-quick-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+.blackout-time-settings {
+    display: grid;
+    grid-template-columns: minmax(128px, .45fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 14px;
+    margin-top: 14px;
+}
+.blackout-all-day-toggle {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+.blackout-time-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 0;
+}
+.blackout-time-range.is-disabled {
+    opacity: .62;
+}
+.blackout-time-range .form-input:disabled {
+    cursor: not-allowed;
+    color: var(--fg-disabled);
+    background: var(--neutral-secondary-soft);
+}
+.blackout-schedule-action {
+    flex: 0 0 auto;
+    min-height: 58px;
+    margin-top: 16px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+}
+.blackout-schedule-action-title {
+    color: var(--text-heading);
+    font-size: 14px;
+    font-weight: 600;
+}
+.blackout-schedule-action-sub {
+    margin-top: 2px;
+    color: var(--text-body-subtle);
+    font-size: 0.8rem;
+}
+.blackout-schedule-button:disabled,
+.blackout-schedule-button:disabled:hover {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--fg-disabled);
+}
+.blackout-schedule-modal {
+    max-width: min(760px, 94vw);
+    height: auto;
+    max-height: min(620px, calc(100vh - 48px));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.blackout-schedule-modal > .b-modal-head,
+.blackout-schedule-modal > .b-modal-foot { flex: 0 0 auto; }
+.blackout-schedule-modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+.blackout-schedule-modal-body .blackout-schedule {
+    height: auto;
+}
+.blackout-schedule {
+    min-height: 0;
+    margin-top: 0;
+    padding: 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.blackout-schedule-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.blackout-schedule-title {
+    color: var(--text-heading);
+    font-weight: 500;
+}
+.blackout-schedule-summary {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--text-body-subtle);
+    font-size: 0.78rem;
+    font-weight: 500;
+    justify-content: flex-end;
+}
+.blackout-schedule-legend {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    color: var(--text-body-subtle);
+    font-size: 0.8rem;
+}
+.blackout-schedule-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.blackout-schedule-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    display: inline-block;
+}
+.blackout-schedule-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    align-content: start;
+    gap: 8px;
+    padding-right: 2px;
+}
+.blackout-schedule-state {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+}
+.blackout-schedule-slot {
+    min-height: 74px;
+    padding: 8px 9px;
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--neutral-secondary-soft);
+    color: var(--text-body);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+.blackout-schedule-slot.available {
+    background: var(--success-soft);
+    border-color: var(--border-success-subtle);
+    color: var(--fg-success-strong);
+}
+.blackout-schedule-slot.booked {
+    background: var(--warning-soft);
+    border-color: var(--border-warning-subtle);
+    color: var(--fg-warning);
+}
+.blackout-schedule-slot.unavailable {
+    background: var(--neutral-tertiary);
+    border-color: var(--border-default);
+    color: var(--fg-disabled);
+}
+.blackout-schedule-slot strong {
+    display: block;
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+@media (max-width: 640px) {
+    .blackout-time-settings {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+}
+</style>
+{% endblock %}
+
+{% block page_subtitle %}<p class="page-subtitle">設定公休日、場地維護或其他暫停營業日期，前台預約會依此關閉可預約時段。</p>{% endblock %}
+
+{% block page_actions %}
+{# 篩選改放進右欄清單標題列(搜尋框右邊);頁首只留主要動作鈕 #}
+<button @click="openAddForm" class="b-btn b-btn-primary">
+    <i class="fa-solid fa-plus"></i>
+    新增暫停營業
+</button>
+{% endblock %}
+
+{% block content %}
+{# SPA:Jinja 資料走 data-page-globals(pageInit mount 前套用;Vue 模板編譯會剝掉 <script>,不可用 script 注入)#}
+<div hidden data-page-globals='{"BLACKOUT_ASSIGNED_COURSE_IDS": {{ assigned_course_ids|tojson }}, "BLACKOUT_COURSE_OPTIONS": {{ courses|tojson }}}'></div>
+
+{# 左日曆 / 右表格 並排,整頁固定高各自內滾。isScopedManager(單一球場管理員)無表格 → 日曆吃滿全寬 #}
+<div class="blackout-split" :style="isScopedManager ? 'grid-template-columns: minmax(0,1fr);' : ''">
+
+    {# ── 左欄:月曆 ── #}
+    <div class="blackout-col" v-if="selectedCourseId">
+        <div class="blackout-col-head">
+            {# 對齊 Google Calendar:月份大標 + 切換(左)· 球場下拉(右)。日曆一次只看一個球場,
+               由右側下拉決定(與右邊表格篩選各自獨立);月份大標即當前月,故不需帶球場名。 #}
+            <div class="blackout-cal-head">
+                <div class="blackout-cal-title">[[ calendarMonthLabel ]]</div>
+                <div class="blackout-cal-nav">
+                    <button type="button" class="b-btn b-btn-ghost b-btn-sm" @click="moveMonth(-1)" aria-label="上個月">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="b-btn b-btn-ghost b-btn-sm" @click="goCurrentMonth">今天</button>
+                    <button type="button" class="b-btn b-btn-ghost b-btn-sm" @click="moveMonth(1)" aria-label="下個月">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="blackout-cal-course">
+                    <select v-model="selectedCourseId" @change="loadCalendar" class="form-input" aria-label="選擇日曆球場">
+                        {% for course in courses %}
+                        <option value="{{ course.id }}">{{ course.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="blackout-col-body is-flush">
+            <div class="blackout-calendar-head">
+                <div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div>週六</div><div>週日</div>
+            </div>
+            {# 切月時保留上一版格線(只淡化 + 疊 spinner),不整塊抽換 → 高度不抖動 #}
+            <div class="blackout-cal-wrap">
+                <div v-if="calendar.error" style="padding: 24px 0; color:var(--fg-danger);">[[ calendar.error ]]</div>
+                <div v-else :class="['blackout-calendar-grid', calendar.loading ? 'is-loading' : '']">
+                    <div v-for="blank in calendar.leadingBlanks" :key="'lead-' + blank" class="blackout-cal-blank"></div>
+                {# 日期數字左上;暫停日=紅底+原因;預約場次/時數用小字(有預約才顯示)。鎖定日淡化不可點。 #}
+                {# 今天:亮起可點(不套 is-locked),點下去跳提示;真正過去日期才 is-locked 灰淡不可點 #}
+                <button
+                    v-for="day in calendar.days"
+                    :key="day.date"
+                    type="button"
+                    :class="['blackout-day', day.is_today ? 'is-today' : '', !day.can_book ? 'is-closed' : '', (day.is_locked && !day.is_today) ? 'is-locked' : '']"
+                    :disabled="day.is_locked && !day.is_today"
+                    :title="day.is_today ? '' : (!day.is_locked ? (day.can_book ? '可預約' : ('暫停營業' + (day.blackout_windows && day.blackout_windows.length ? '：' + (day.blackout_windows[0].reason || '') : ''))) : '')"
+                    @click="openDayForm(day)"
+                >
+                    {# 頂列:日期(左) + 可預約/不可預約 badge(右,與日期同一行);過去日期不顯示 badge #}
+                    <div class="blackout-day-top">
+                        <span class="blackout-day-number">[[ day.day ]]</span>
+                        <span v-if="!day.is_locked || day.is_today" :class="['blackout-day-status', day.can_book ? '' : 'closed']">
+                            [[ day.can_book ? '可預約' : '不可預約' ]]
+                        </span>
+                    </div>
+                    {# 中段:暫停原因(有才顯示),自然撐開把底部 meta 推到最底 #}
+                    <div v-if="!day.can_book && (!day.is_locked || day.is_today)" class="blackout-day-reason">
+                        [[ (day.blackout_windows && day.blackout_windows.length && day.blackout_windows[0].reason) || '暫停營業' ]]
+                    </div>
+                    {# 底部區塊:淺灰底 + 上分隔線;每列 標籤靠左、數值靠右。標籤精簡成 場次/時數 免換行 #}
+                    <div class="blackout-day-meta">
+                        <div class="blackout-day-metarow"><span class="bm-label">場次</span><span class="bm-value">[[ day.booking_count ]] 筆</span></div>
+                        <div class="blackout-day-metarow"><span class="bm-label">時數</span><span class="bm-value">[[ formatHours(day.booked_hours) ]]</span></div>
+                    </div>
+                </button>
+                    {# 月底沒滿一週:尾端補空白格(像一般月曆),不硬拉整列 #}
+                    <div v-for="blank in trailingBlanks" :key="'trail-' + blank" class="blackout-cal-blank"></div>
+                </div>
+                <div v-if="calendar.loading" class="blackout-cal-spinner"><i class="fa-solid fa-spinner fa-spin"></i></div>
+            </div>
+        </div>
+    </div>
+
+    {# ── 右欄:暫停窗口清單(單一球場管理員不顯示)── #}
+    <div class="blackout-col" v-if="!isScopedManager">
+        <div class="blackout-col-head">
+            <div class="blackout-col-title">暫停窗口清單</div>
+            {# 搜尋 + 篩選:清單專屬(搜尋左、篩選右)。篩選作用在此表格,與左側日曆各自獨立 #}
+            <div class="blackout-list-tools">
+                <div class="a-search a-search-sm">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" v-model.trim="tableSearch" @input="onTableSearch"
+                           placeholder="搜尋球場 / 原因" aria-label="搜尋暫停窗口">
+                    <button type="button" v-show="tableSearch" class="a-search-clear" @click="clearTableSearch" aria-label="清除搜尋">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                </div>
+                <div class="b-pop">
+                    <button type="button" class="b-btn b-btn-filter" data-pop aria-expanded="false">
+                        <i class="fa-solid fa-filter"></i>篩選<i class="fa-solid fa-chevron-down b-pop-caret"></i>
+                    </button>
+                    <div class="b-pop-panel">
+                        <p class="b-pop-panel-title">篩選條件</p>
+                        <div class="form-group">
+                            <label class="b-label">球場</label>
+                            <select v-model="filters.course_id" class="form-input">
+                                <option value="">全部球場</option>
+                                {% for course in courses %}
+                                <option value="{{ course.id }}">{{ course.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="b-label">狀態</label>
+                            <select v-model="filters.status" class="form-input">
+                                <option value="">全部狀態</option>
+                                <option value="active">啟用</option>
+                                <option value="inactive">停用</option>
+                            </select>
+                        </div>
+                        <div class="b-pop-foot">
+                            <button type="button" class="b-btn-reset" @click="resetFilters" data-pop-close>重置</button>
+                            <button type="button" class="b-btn b-btn-primary b-btn-sm" @click="reloadTable" data-pop-close>套用</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="blackout-col-body is-flush">
+            <div class="b-tbl-scroll" v-show="!tableEmpty">
+                <table id="blackoutTable" class="b-tbl" style="width: 100%;">
+                    <thead>
+                        <tr></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            {# 沒有符合:置中空狀態(取代 DataTables 那條有框線的 zeroRecords 列)#}
+            <div v-show="tableEmpty" class="b-empty blackout-empty">
+                <div class="b-empty-icon"><i class="fa-regular fa-calendar-xmark"></i></div>
+                <p class="b-empty-title">沒有暫停營業窗口</p>
+                <p class="b-empty-sub">目前沒有符合條件的暫停營業窗口。點右上「新增暫停營業」或月曆上的日期即可新增。</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── 新增/編輯 modal(套 .b-modal.is-soft,對齊 course_manage;v-show + data-modal-anim=vue → 自動 BDropdown 增強 + 淡入淡出)── #}
+<transition name="b-modal-fade">
+<div v-show="showForm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeForm">
+    <div class="b-modal is-soft blackout-form-modal" role="dialog" aria-modal="true" aria-labelledby="blackoutFormTitle">
+        <div class="b-modal-head">
+            <div>
+                <h2 id="blackoutFormTitle" class="b-modal-title">[[ isEdit ? '編輯暫停營業' : '新增暫停營業' ]]</h2>
+                <p class="b-modal-sub">用日期區間設定球場不可預約窗口。</p>
+            </div>
+            <button type="button" class="b-modal-close" @click="closeForm" aria-label="關閉">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="b-modal-body blackout-form-body">
+            <form class="blackout-form" @submit.prevent="submitForm">
+                <div class="blackout-form-layout">
+                    <div class="blackout-form-main">
+                        <div class="blackout-form-grid">
+                            <div>
+                                <label class="form-label">球場 <span style="color: var(--fg-danger);">*</span></label>
+                                <select v-model="formData.course_id" :class="['form-input', errors.course_id ? 'error' : '']" @change="loadDaySchedule(formData.course_id, formData.start_date)">
+                                    <option value="">請選擇球場</option>
+                                    {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <p v-if="errors.course_id" class="form-error">[[ errors.course_id ]]</p>
+                            </div>
+                            <div>
+                                <label class="form-label">狀態</label>
+                                <select v-model="formData.status" class="form-input">
+                                    <option value="active">啟用</option>
+                                    <option value="inactive">停用</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label">開始日期 <span style="color: var(--fg-danger);">*</span></label>
+                                <input type="date" v-model="formData.start_date" :min="getNextEditableDate()" :class="['form-input', errors.date ? 'error' : '']" @change="loadDaySchedule(formData.course_id, formData.start_date)">
+                            </div>
+                            <div>
+                                <label class="form-label">結束日期 <span style="color: var(--fg-danger);">*</span></label>
+                                <input type="date" v-model="formData.end_date" :min="getNextEditableDate()" :class="['form-input', errors.date ? 'error' : '']">
+                            </div>
+                        </div>
+                        <p v-if="errors.date" class="form-error" style="margin-top:8px;">[[ errors.date ]]</p>
+
+                        <div class="blackout-schedule-action">
+                            <div>
+                                <div class="blackout-schedule-action-title">當日時刻表</div>
+                                <div class="blackout-schedule-action-sub">
+                                    [[ formData.course_id ? ((schedule.loaded && !schedule.error) ? '已載入 ' + (schedule.slots.length || 0) + ' 個時段' : '查看所選球場與日期的可預約狀態') : '請先選擇球場' ]]
+                                </div>
+                            </div>
+                            <button type="button"
+                                    class="b-btn b-btn-ghost b-btn-sm blackout-schedule-button"
+                                    :disabled="!formData.course_id || !formData.start_date || schedule.loading"
+                                    @click="openScheduleModal">
+                                <i :class="schedule.loading ? 'fa-solid fa-spinner fa-spin' : 'fa-regular fa-clock'"></i>
+                                <span>[[ schedule.loading ? '載入中' : '查看' ]]</span>
+                            </button>
+                        </div>
+
+                        <div class="blackout-time-settings">
+                            <label class="form-label blackout-all-day-toggle">
+                                <input type="checkbox" class="b-check" v-model="formData.is_all_day">
+                                全天暫停營業
+                            </label>
+
+                            <div :class="['blackout-time-range', formData.is_all_day ? 'is-disabled' : '']">
+                                <div>
+                                    <label class="form-label">開始時間</label>
+                                    <input type="time" v-model="formData.start_time" :disabled="formData.is_all_day" :class="['form-input', errors.time ? 'error' : '']">
+                                </div>
+                                <div>
+                                    <label class="form-label">結束時間</label>
+                                    <input type="time" v-model="formData.end_time" :disabled="formData.is_all_day" :class="['form-input', errors.time ? 'error' : '']">
+                                </div>
+                            </div>
+                        </div>
+                        <p v-if="errors.time" class="form-error" style="margin-top:8px;">[[ errors.time ]]</p>
+
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label class="form-label">原因</label>
+                            <input type="text" v-model="formData.reason" class="form-input" placeholder="例如：公休日、場地維護、包場活動">
+                            <div class="blackout-quick-reasons">
+                                <button v-for="reason in quickReasons" :key="reason" type="button" class="b-btn b-btn-ghost b-btn-xs" @click="formData.reason = reason">
+                                    [[ reason ]]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="b-modal-foot">
+            <button type="button" :disabled="isSubmitting" class="b-btn b-btn-text" @click="submitForm">
+                <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                <span>[[ isEdit ? '儲存變更' : '新增窗口' ]]</span>
+            </button>
+        </div>
+    </div>
+</div>
+</transition>
+
+{# 當日時刻表:獨立 modal,不改變新增/編輯 modal 尺寸 #}
+<transition name="b-modal-fade">
+<div v-show="showScheduleModal" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="closeScheduleModal">
+    <div class="b-modal is-soft blackout-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="blackoutScheduleTitle">
+        <div class="b-modal-head">
+            <div>
+                <h2 id="blackoutScheduleTitle" class="b-modal-title">當日時刻表</h2>
+                <p class="b-modal-sub">[[ schedule.course.name || selectedCourseName ]] / [[ schedule.date || formData.start_date ]]</p>
+            </div>
+            <button type="button" class="b-modal-close" @click="closeScheduleModal" aria-label="關閉">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="b-modal-body blackout-schedule-modal-body">
+            <div class="blackout-schedule">
+                <div class="blackout-schedule-head">
+                    <div>
+                        <div class="blackout-schedule-title">營業時段狀態</div>
+                        <div style="color:var(--text-body-subtle); font-size:0.82rem; margin-top:3px;">[[ schedule.course.name || selectedCourseName ]] / [[ schedule.date || formData.start_date ]]</div>
+                    </div>
+                    <div v-if="schedule.loaded" class="blackout-schedule-summary">
+                        <span>已預訂 [[ schedule.summary.booked_count ]]</span>
+                        <span>可預訂 [[ schedule.summary.available_count ]]</span>
+                        <span>不可預訂 [[ schedule.summary.unavailable_count ]]</span>
+                    </div>
+                </div>
+                <div class="blackout-schedule-legend">
+                    <span><i class="blackout-schedule-dot" style="background:var(--success);"></i>可預訂</span>
+                    <span><i class="blackout-schedule-dot" style="background:var(--warning);"></i>已預訂</span>
+                    <span><i class="blackout-schedule-dot" style="background:var(--neutral-quaternary);"></i>不可預訂</span>
+                </div>
+                <div v-if="schedule.loading" class="blackout-schedule-state" style="color:var(--text-body-subtle);">
+                    <i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>時刻表載入中...
+                </div>
+                <div v-else-if="schedule.error" class="blackout-schedule-state" style="color:var(--fg-danger);">[[ schedule.error ]]</div>
+                <div v-else-if="schedule.loaded && !schedule.slots.length" class="blackout-schedule-state" style="color:var(--text-body-subtle);">當日沒有可顯示的營業時段。</div>
+                <div v-else class="blackout-schedule-grid">
+                    <div
+                        v-for="slot in schedule.slots"
+                        :key="slot.label"
+                        :class="['blackout-schedule-slot', slot.status]"
+                    >
+                        <strong>[[ slot.label ]]</strong>
+                        <div v-if="slot.status === 'booked'">
+                            <div>[[ slot.booking_status_label ]]</div>
+                            <div>[[ slot.member_name || '會員' ]]</div>
+                            <div style="opacity:.75;">[[ slot.booking_no ]]</div>
+                        </div>
+                        <div v-else-if="slot.status === 'available'">
+                            <div>可預訂</div>
+                        </div>
+                        <div v-else>
+                            <div>不可預訂</div>
+                            <div v-if="slot.reason" style="opacity:.75;">[[ slot.reason ]]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="b-modal-foot">
+            <button type="button" class="b-btn b-btn-text" @click="closeScheduleModal">關閉</button>
+        </div>
+    </div>
+</div>
+</transition>
+
+{# 點今天:自訂提示 modal(取代瀏覽器 alert),說明當日不可設暫停 #}
+<transition name="b-modal-fade">
+<div v-show="showTodayAlert" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="showTodayAlert = false">
+    <div class="b-modal is-alert" role="alertdialog" aria-modal="true" aria-labelledby="todayAlertTitle">
+        <div class="b-alert-body">
+            <div class="b-alert-icon b-alert-icon-warn" aria-hidden="true">
+                <i class="fa-solid fa-circle-info"></i>
+            </div>
+            <h2 id="todayAlertTitle" class="b-alert-title">當日無法設定暫停</h2>
+            <p class="b-alert-desc">今天的可預約時段可能已開放或已有預約，暫停營業只能設定明天(含)以後的日期。</p>
+        </div>
+        <div class="b-alert-foot">
+            <button type="button" class="b-btn b-btn-text" @click="showTodayAlert = false">我知道了</button>
+        </div>
+    </div>
+</div>
+</transition>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "cms/base.html" %}
+
+{% block title %}組織管理{% endblock %}
+{% block page_title %}組織管理{% endblock %}
+{# 樹狀元件:固定高框架 → 樹狀內容區內滾,外層整頁不滾(不套 DataTables/搜尋) #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 樹狀清單捲動容器:沿用 .b-tbl-scroll 白卡外框,補一點內距讓節點不貼邊 */
+.b-tree-scroll { padding: 8px 10px; }
+</style>
+{% endblock %}
+
+{% block page_actions %}
+<button @click="openAddForm(null, 1)" class="b-btn b-btn-primary">
+    <i class="fa-solid fa-plus"></i>
+    新增頂級機關
+</button>
+{% endblock %}
+
+{% block content %}
+{# 樹狀元件:.b-tbl-scroll 當 .main-content 直接子項 → is-fixed-h 吃剩餘高、樹狀內容內滾;.b-tree-scroll 補內距 #}
+<div class="b-tbl-scroll b-tree-scroll">
+    <!-- 樹狀列表 -->
+    <div v-if="storeTree.length > 0">
+        <div v-for="store in storeTree" :key="store.id">
+            <tree-node :node="store"
+                       @edit="openEditForm"
+                       @add-child="openAddChildForm"
+                       @delete="deleteStore">
+            </tree-node>
+        </div>
+    </div>
+    <div v-else class="empty-state">
+        <i class="fa-solid fa-building"></i>
+        <p>尚無機關資料</p>
+        <button @click="openAddForm(null, 1)" class="b-btn b-btn-primary">
+            <i class="fa-solid fa-plus"></i>
+            新增第一個機關
+        </button>
+    </div>
+</div>
+
+<!-- 新增/編輯:modal(Vue 驅動;對齊系統 modal:is-soft + b-modal-fade 淡入淡出 + 無取消,寬扁 2 欄) -->
+<transition name="b-modal-fade">
+<div v-show="showForm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="requestClose">
+        <div class="b-modal is-soft" role="dialog" aria-modal="true" style="max-width: 720px;">
+            <div class="b-modal-head">
+                <h2 class="b-modal-title">[[ isEdit ? '編輯機關' : '新增機關' ]]</h2>
+                <button type="button" class="b-modal-close" @click="requestClose" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form @submit.prevent="submitForm">
+                <div class="b-modal-body">
+                <div class="b-form-grid">
+                <!-- 層級 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        層級 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <select v-model.number="formData.levels"
+                            @change="onLevelChange"
+                            :disabled="isEdit"
+                            :class="['form-input', errors.levels ? 'error' : '']">
+                        <option value="">請選擇層級</option>
+                        <option :value="1">第一級（頂級機關）</option>
+                        <option :value="2">第二級</option>
+                        <option :value="3">第三級</option>
+                    </select>
+                    <p v-if="errors.levels" class="form-error">[[ errors.levels ]]</p>
+                </div>
+
+                <!-- 上級機關 -->
+                <div v-if="formData.levels > 1" class="form-group">
+                    <label class="form-label">
+                        上級機關 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <select v-model="formData.parent_id"
+                            :class="['form-input', errors.parent_id ? 'error' : '']">
+                        <option value="">請選擇上級機關</option>
+                        <option v-for="opt in parentOptions" :key="opt.id" :value="opt.id">
+                            [[ opt.name ]] (第[[ opt.levels ]]級)
+                        </option>
+                    </select>
+                    <p v-if="errors.parent_id" class="form-error">[[ errors.parent_id ]]</p>
+                </div>
+
+                <!-- 機關名稱 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        機關名稱 <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <input type="text"
+                           v-model="formData.name"
+                           placeholder="請輸入機關名稱"
+                           :class="['form-input', errors.name ? 'error' : '']">
+                    <p v-if="errors.name" class="form-error">[[ errors.name ]]</p>
+                </div>
+
+                <!-- 統一編號 -->
+                <div class="form-group">
+                    <label class="form-label">統一編號</label>
+                    <input type="text"
+                           v-model="formData.idcode"
+                           placeholder="請輸入統一編號"
+                           class="form-input">
+                </div>
+
+                <!-- 電話 -->
+                <div class="form-group">
+                    <label class="form-label">聯絡電話</label>
+                    <input type="text"
+                           v-model="formData.phone"
+                           placeholder="請輸入聯絡電話"
+                           class="form-input">
+                </div>
+
+                <!-- 地址 -->
+                <div class="form-group">
+                    <label class="form-label">地址</label>
+                    <input type="text"
+                           v-model="formData.address"
+                           placeholder="請輸入地址"
+                           class="form-input">
+                </div>
+
+                <!-- 排序 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        排序 <span style="color: var(--text-body-subtle); font-size: 0.85rem;">(數字越小越前面)</span>
+                    </label>
+                    <input type="number"
+                           v-model.number="formData.sort"
+                           min="0"
+                           max="255"
+                           class="form-input">
+                </div>
+
+                </div><!-- /b-form-grid -->
+                </div>
+                <div class="b-modal-foot">
+                    <button type="submit" :disabled="isSubmitting || formIncomplete" class="b-btn b-btn-text">
+                        <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
+                        <span>[[ isEdit ? '儲存變更' : '確認新增' ]]</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</transition>
+
+<!-- 關閉確認:有輸入/修改才跳(對齊球場管理的 .b-modal.is-alert)-->
+<transition name="b-modal-fade">
+<div v-show="showCloseConfirm" class="b-modal-overlay is-visible is-open" data-modal-vue data-modal-anim="vue" @click.self="cancelClose">
+    <div class="b-modal is-alert" role="alertdialog" aria-modal="true">
+        <div class="b-alert-body">
+            <div class="b-alert-icon b-alert-icon-danger" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 class="b-alert-title">要放棄這次編輯嗎?</h2>
+            <p class="b-alert-desc">你[[ isEdit ? '的修改' : '輸入的資料' ]]尚未儲存,現在關閉不會保留。</p>
+        </div>
+        <div class="b-alert-foot">
+            <button type="button" class="b-btn b-btn-quiet" @click="cancelClose">繼續編輯</button>
+            <button type="button" class="b-btn b-btn-text b-btn-text-danger" @click="confirmClose">放棄並關閉</button>
+        </div>
+    </div>
+</div>
+</transition>
+{% endblock %}
+

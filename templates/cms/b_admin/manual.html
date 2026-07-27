@@ -1,0 +1,126 @@
+{% extends "cms/b_admin/base.html" %}
+
+{% block title %}操作手冊{% endblock %}
+{% block page_title %}操作手冊{% endblock %}
+{% block main_modifier %}is-fixed-h is-manual-fixed{% endblock %}
+
+{% block content %}
+{# 截圖:乾淨外框 + 下方小字說明(token 樣式在 b_admin.css .b-shot) #}
+{% macro shot(path, caption) %}
+<figure class="b-shot">
+    <img src="{{ url_for('static', filename=path) }}" alt="{{ caption }}" loading="lazy">
+    <figcaption>{{ caption }}</figcaption>
+</figure>
+{% endmacro %}
+
+{% macro step(n, html) %}
+<li>
+    <span class="b-manual-step-n">{{ n }}</span>
+    <span>{{ html|safe }}</span>
+</li>
+{% endmacro %}
+
+<div id="b-manual" class="b-manual">
+    <!-- 左:固定收邊框 + 框內捲(對齊時段管理「排程設定」tab 的內滾模式) -->
+    <div class="b-manual-frame">
+        <div class="b-manual-scroll">
+
+        <!-- ===== 後台首頁 ===== -->
+        <section id="m-dashboard" class="b-card b-manual-sec">
+            <div class="b-card-head"><h2 class="b-card-title">後台首頁(今日營運)</h2></div>
+            <div class="b-card-body">
+                <ol class="b-manual-steps">
+                    {{ step(1, '登入後預設進入「後台首頁」,可快速掌握 <b>今日預約組數、待確認、線上已付款、現場付款</b> 等數字。') }}
+                    {{ step(2, '想處理某筆預約,直接點左側選單的 <b>「球場預約管理 → 預約管理」</b>。') }}
+                    {{ step(3, '側欄左下角的收合鈕可收窄選單,讓工作區更寬。') }}
+                </ol>
+                <div class="b-manual-shots">
+                    {{ shot('manual/badmin_dashboard.png', '後台首頁:今日營運數字一覽') }}
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 時段管理 ===== -->
+        <section id="m-slots" class="b-card b-manual-sec">
+            <div class="b-card-head"><h2 class="b-card-title">時段管理</h2></div>
+            <div class="b-card-body">
+                <ol class="b-manual-steps">
+                    {{ step(1, '進入 <b>「時段管理」</b>。先設定 <b>球區</b>(一個球場常分成幾個區,例如東區/西區),可新增、改名與排序。') }}
+                    {{ step(2, '設定 <b>開放日期範圍</b>、<b>每組間隔</b>(每隔幾分鐘開放一個開球時間)、<b>每時段容量</b>(同一時段最多幾組)與 <b>基本價格</b>。') }}
+                    {{ step(3, '可依 <b>星期</b> 或 <b>指定日期區間</b> 設定不同價格(例如假日加價)。') }}
+                    {{ step(4, '需要暫停某天或某時段時,用 <b>休息時段</b> 或 <b>日期狀態</b> 關閉,前台就不會出現該時段。') }}
+                    {{ step(5, '上方可切換日期,綠色代表開放、有底色的格子代表已被預約。') }}
+                    {{ step(6, '在發球表上 <b>點任一時段格子</b>,可查看該時段訂單、調整狀態,或 <b>代客建立預約</b>(現場 / 電話預約)。建立前系統會自動確認該時段尚有剩餘名額,額滿或關閉的時段無法建立。') }}
+                </ol>
+                <div class="b-manual-shots">
+                    {{ shot('manual/badmin_slots.png', '時段管理:點時段格子可代客建立預約、調整狀態') }}
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 預約管理 ===== -->
+        <section id="m-bookings" class="b-card b-manual-sec">
+            <div class="b-card-head"><h2 class="b-card-title">預約管理</h2></div>
+            <div class="b-card-body">
+                <ol class="b-manual-steps">
+                    {{ step(1, '用 <b>日期、狀態、付款狀態或關鍵字</b> 篩選要找的預約。本頁用於 <b>查詢與調整既有預約</b>。') }}
+                    {{ step(2, '要 <b>代客建立預約</b>(現場 / 電話)時,請到 <b>「時段管理」</b> 點該時段格子建立(本頁不提供建立)。') }}
+                    {{ step(3, '調整 <b>人數或狀態</b> 後,記得確認 <b>總額與付款紀錄</b> 是否需要一起更新。') }}
+                    {{ step(4, '客人取消或未到場(No-show)的訂單,請依內部規則更新狀態。') }}
+                </ol>
+                <div class="b-manual-shots">
+                    {{ shot('manual/badmin_bookings.png', '預約管理:篩選與既有預約的狀態調整') }}
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 帳務與報到 ===== -->
+        <section id="m-billing" class="b-card b-manual-sec">
+            <div class="b-card-head"><h2 class="b-card-title">帳務與報到</h2></div>
+            <div class="b-card-body">
+                <ol class="b-manual-steps">
+                    {{ step(1, '<b>「帳務管理」</b> 可看 <b>待補收總額、待退款總額</b>,以及每筆收付明細(可切換待處理/已完成/作廢)。') }}
+                    {{ step(2, '要新增一筆收付時,填 <b>預約編號、收款/退款、金額、說明</b> 後按「新增紀錄」。') }}
+                    {{ step(3, '現場收款完成後,把該筆標記為 <b>完成</b>,並確認訂單的付款狀態同步更新。') }}
+                    {{ step(4, '<b>「報到掃描」</b> 可掃描客人的 QR Code 或輸入預約編號查詢,確認後系統會把訂單更新為 <b>已報到</b>。') }}
+                </ol>
+                <div class="b-manual-shots">
+                    {{ shot('manual/badmin_billing.png', '帳務管理:待收/待退與收付明細') }}
+                    {{ shot('manual/badmin_checkin.png', '報到掃描:掃 QR Code 或輸入編號核對') }}
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 外觀與多語 ===== -->
+        <section id="m-appearance" class="b-card b-manual-sec">
+            <div class="b-card-head"><h2 class="b-card-title">前台外觀與多語</h2></div>
+            <div class="b-card-body">
+                <ol class="b-manual-steps">
+                    {{ step(1, '<b>「前台主題」</b> 可更新 <b>Logo、主視覺圖、主色與首頁文案</b>,讓預約站呈現自家品牌,右側會即時預覽前台。') }}
+                    {{ step(2, '<b>「多語內容」</b> 可維護 <b>球場名稱、首頁文案、球區與時段</b> 的多語翻譯。') }}
+                    {{ step(3, '修改後點右上角的 <b>「前往前台」</b> 圖示鈕,開新分頁確認實際顯示是否正確。') }}
+                </ol>
+                <div class="b-manual-shots">
+                    {{ shot('manual/badmin_theme.png', '前台主題:Logo、主色與首頁文案') }}
+                    {{ shot('manual/badmin_i18n.png', '多語內容:各語系翻譯維護') }}
+                </div>
+            </div>
+        </section>
+        </div>
+    </div>
+
+    <!-- 頁內導覽:顯示目前捲到哪一段,點擊平滑捲過去(manual.js scrollspy) -->
+    <nav class="b-manual-toc" aria-label="頁內導覽">
+        <div class="b-manual-toc-title">本頁內容</div>
+        <a href="#m-dashboard">後台首頁</a>
+        <a href="#m-slots">時段管理</a>
+        <a href="#m-bookings">預約管理</a>
+        <a href="#m-billing">帳務與報到</a>
+        <a href="#m-appearance">外觀與多語</a>
+    </nav>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# SPA:manual.js 已在 base.html 殼層載入並註冊 pageInit.manual;此頁 extra_js 留空。 #}
+{% endblock %}
