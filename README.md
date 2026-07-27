@@ -93,6 +93,23 @@ backend-design/
 - **桌機 only**:這套後台不做手機版(內部工具)。
 - 版本戳習慣:引用時帶 `?v=YYYYMMDDx` query(改檔後遞增,避免瀏覽器快取吃舊檔)。
 
+## Icon / 導覽(nav)/ 登入頁
+
+### Icon(lucide 為主,CDN 載入、無 vendor 檔)
+- **殼層 + B 後台頁面 = [lucide](https://lucide.dev)**:`<i data-lucide="calendar-check">` 寫法,由 base.html 的 `window.renderLucideIcons()` 統一渲染(`createIcons({ attrs: { 'stroke-width': 2.2 } })` — 全站線寬一致)。**動態注入的 markup 要再呼叫一次 `renderLucideIcons()`** 才會變成 SVG(toast、SPA 換頁後皆同)。
+- **A 後台頁面內容 = Font Awesome**(CDN;12 支頁面 JS 產的是 FA markup),與殼層 lucide 並存。新專案可統一挑一套。
+- **側欄圖示自動對應**:`getMenuIcon(menu)`(base.html)用選單標題/URL 關鍵字比對出 lucide icon 名(dashboard→gauge、桿弟→users、帳務→circle-dollar-sign…),**規則順序有意義**(易混淆的放前面);新專案加選單只要在規則表補一行。
+- ⚠️ **lucide 節點不可被 Vue `v-if` 抽換**(createIcons 會把 `<i>` 換成 SVG,Vue 卸載原節點時會爆掉整個 app)— 深淺色那類切換要兩顆 icon 都先渲染、用 class 切顯示。下拉 caret 這種 JS 動態注入的元素用**內嵌 SVG**(dropdown.js 的做法),不經 lucide。
+
+### 導覽 / Nav 架構(整套在 base.html + b_admin.css/base.css)
+- 結構:固定 `top-header`(logo/字級/深淺色/手冊/前台/帳號下拉)+ 左側 `sidebar`(選單)+ `main-content`。
+- **選單資料來自 API**:`GET /cms/<code>/usermenu`(B)/ A 版同構,回 `{ success, menu: [{ id, title, url, sub: [{ id, title, url }] }] }` — 靜態專案給一份同形狀的 JSON 即可(demo/預覽就是走 `window.__B_PREVIEW_MENU` 注入)。
+- 行為(Vue 殼層已實作):手風琴 **single-open**;`sidebarCollapsed` 收合軌(存 localStorage)— 收合時點群組改開 `.cms-flyout` 浮窗(transition 動畫);active 判斷 `isCurrentMenuItem` / `isGroupActive`;連結由 `menuHref(url)` 組(前綴集中一處,新專案改這個 method 就好);儀表板獨立置頂、登出住右上帳號下拉(側欄不重複放)。
+- 樣式:active = brand 色淡底 pill + brand 色字、hover 只變文字色;`.menu-caret` 旋轉;`.submenu` 高度過渡。全部吃 token → 跟著 brand.css 換色。
+
+### 登入頁
+- `templates/cms/b_admin/login.html`(B,吃球場主色)/ `templates/cms/login.html`(A)+ `static/css/login.css`。置中卡片、`.b-input`/`.b-btn` 元件、brand token 配色 — 換專案只要 brand.css 換色,登入頁自動跟。
+
 ## ★ 內滾機制(固定高頁面,整頁不捲、只捲內容區)
 
 列表/表格頁的核心版型:**外層不滾,捲動只發生在內容框內、thead 釘住**。CSS 全在 `b_admin.css`。
