@@ -1,0 +1,717 @@
+﻿/* CMS 後台核心版面樣式 */
+
+:root {
+    /* 2026-07-02 翻新:舊語意變數改指向 typeui token(b_tokens.css / b_admin.css 提供),
+       舊 markup 的 var(--border-color) 等自動吃新色系 + 深淺色。
+       fallback 值保留舊色,萬一某頁沒載 token 也不至於無色。 */
+    --primary-color: var(--brand, #005a87);
+    --primary-dark: var(--brand-strong, #003d5c);
+    --secondary-bg: var(--neutral-secondary-soft, #f4f7f6);
+    --text-main: var(--text-body, #333);
+    --border-color: var(--border-default, #e0e0e0);
+    --success-color: var(--fg-success, #28a745);
+    --warning-color: var(--fg-warning-subtle, #ff9800);
+    --danger-color: var(--fg-danger, #d32f2f);
+    --info-color: var(--fg-brand, #1976d2);
+    --header-height: 64px;
+    --sidebar-width: 260px;
+    --corner-shape: squircle;
+}
+
+@supports (corner-shape: squircle) {
+    :where(
+        .skip-link,
+        .mobile-menu-btn,
+        .menu-item,
+        .toggle-btn,
+        .content-card,
+        .btn,
+        .tag,
+        .form-control,
+        .main-content .rounded,
+        .main-content .rounded-sm,
+        .main-content .rounded-md,
+        .main-content .rounded-lg,
+        .main-content .rounded-xl,
+        .main-content .rounded-2xl,
+        .main-content .rounded-3xl
+    ):not(.rounded-full) {
+        corner-shape: var(--corner-shape, squircle);
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    background-color: var(--secondary-bg);
+    color: var(--text-main);
+    padding-top: var(--header-height);
+}
+
+.skip-link {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 2000;
+    transform: translateY(-150%);
+    border-radius: 6px;
+    background: #fff;
+    color: #1e293b;
+    font-weight: 700;
+    padding: 10px 14px;
+    box-shadow: 0 0 0 3px #ffbf47;
+    transition: transform 0.15s ease;
+}
+
+    .skip-link:focus {
+        transform: translateY(0);
+    }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid #ffbf47;
+    outline-offset: 3px;
+}
+
+.main-content:focus {
+    outline: none;
+}
+
+/* 置頂導航列 */
+.top-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--header-height);
+    background: white;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: calc(var(--sidebar-width) + 56px);
+    flex-shrink: 0;
+}
+
+    .header-logo .logo-icon {
+        width: 132px;
+        min-width: 132px;
+        max-width: 132px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex: 0 0 132px;
+    }
+
+        .header-logo .logo-icon img {
+            width: auto;
+            height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+    .header-logo .logo-text {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: var(--primary-color);
+    }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+    .header-right a,
+    .header-right button {
+        background: none;
+        border: 0;
+        color: #666;
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+        .header-right a:hover,
+        .header-right button:hover {
+            color: var(--primary-color);
+        }
+
+    .header-right .logout-link:hover {
+        color: var(--danger-color);
+    }
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+    .header-user i {
+        font-size: 1.3rem;
+        color: var(--primary-color);
+    }
+
+/* 手機版選單按鈕 */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 8px;
+}
+
+/* 左側導航欄 */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: #fff;
+    height: calc(100vh - var(--header-height));
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    z-index: 900;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+    .sidebar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 2px;
+    }
+
+/* 導航選單 */
+.sidebar-nav {
+    flex: 1;
+    padding: 12px 0;
+}
+
+.menu-item {
+    background: none;
+    border: 0;
+    width: calc(100% - 24px);
+    padding: 12px 16px;
+    cursor: pointer;
+    margin: 4px 12px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    color: #64748b;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+    .menu-item i {
+        width: 24px;
+        margin-right: 12px;
+        font-size: 1.1rem;
+        text-align: center;
+        flex-shrink: 0;
+        color: #64748b;
+        transition: color 0.2s ease, transform 0.2s ease;
+    }
+
+    .menu-item:hover {
+        background-color: #f1f5f9;
+        color: var(--primary-color);
+    }
+
+        .menu-item:hover i,
+        .menu-item.active i {
+            color: var(--primary-color);
+        }
+
+    .menu-item.active {
+        background-color: #f0f9ff;
+        color: var(--primary-color);
+        font-weight: bold;
+        position: relative;
+    }
+
+        .menu-item.active::before {
+            content: '';
+            position: absolute;
+            left: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 24px;
+            width: 4px;
+            background-color: var(--primary-color);
+            border-radius: 0 4px 4px 0;
+        }
+
+/* 子選單 */
+.submenu-toggle {
+    justify-content: space-between;
+    width: calc(100% - 24px);
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+    .submenu-toggle .menu-left {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    .submenu-toggle .chevron {
+        font-size: 0.75rem;
+        transition: transform 0.2s;
+    }
+
+    .submenu-toggle.open .chevron {
+        transform: rotate(180deg);
+    }
+
+.submenu {
+    display: none;
+    margin-left: 36px;
+    padding-left: 16px;
+    border-left: 1px solid var(--border-color);
+}
+
+    .submenu.show {
+        display: block;
+    }
+
+    .submenu .menu-item {
+        font-size: 0.9rem;
+        padding: 10px 12px;
+        margin: 2px 0;
+        color: #64748b;
+    }
+
+        .submenu .menu-item i {
+            width: 20px;
+            margin-right: 10px;
+            font-size: 0.95rem;
+        }
+
+        .submenu .menu-item.active {
+            background-color: rgba(0, 90, 135, 0.1);
+            color: var(--primary-color);
+        }
+
+            .submenu .menu-item.active::before {
+                display: none;
+            }
+
+/* 分隔線 */
+.menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 12px;
+}
+
+/* 登出連結 */
+.menu-item.logout:hover {
+    background-color: #fef2f2;
+    color: var(--danger-color);
+}
+
+/* 側欄縮放按鈕 */
+.sidebar-toggle {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.toggle-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: #f8fafc;
+    color: #64748b;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .toggle-btn:hover {
+        background: #f1f5f9;
+        color: var(--primary-color);
+    }
+
+/* 側欄收合狀態 */
+.sidebar.collapsed {
+    width: 64px;
+}
+
+    .sidebar.collapsed .menu-text {
+        display: none;
+    }
+
+    .sidebar.collapsed .menu-item {
+        justify-content: center;
+        padding: 12px 0;
+        margin: 4px 8px;
+    }
+
+        .sidebar.collapsed .menu-item i {
+            margin-right: 0;
+            font-size: 1.2rem;
+        }
+
+    .sidebar.collapsed .submenu-toggle {
+        justify-content: center;
+    }
+
+        .sidebar.collapsed .submenu-toggle .chevron {
+            display: none;
+        }
+
+    .sidebar.collapsed .submenu {
+        display: none;
+    }
+
+    .sidebar.collapsed .menu-divider {
+        margin: 12px 8px;
+    }
+
+    .sidebar.collapsed ~ .main-content {
+        margin-left: 64px;
+    }
+
+    .sidebar.collapsed ~ .sidebar-overlay {
+        display: none;
+    }
+
+/* 主內容區 */
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 24px;
+    min-height: calc(100vh - var(--header-height));
+    transition: margin-left 0.3s ease;
+}
+
+/* 頁面標題 */
+.page-header {
+    margin-bottom: 24px;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.page-subtitle {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+/* 內容區塊 */
+.content-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding-left: 10px;
+    border-left: 4px solid var(--primary-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* 底部 */
+.main-footer {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border-color);
+    background: white;
+    margin-top: 24px;
+}
+
+/* 遮罩層 */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 850;
+}
+
+/* 通用按鈕樣式 */
+.btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+    .btn-primary:hover {
+        background: var(--primary-dark);
+    }
+
+.btn-outline {
+    border: 1px solid var(--border-color);
+    background: white;
+    color: #555;
+}
+
+    .btn-outline:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+.btn-danger {
+    background: white;
+    color: var(--danger-color);
+    border: 1px solid var(--danger-color);
+}
+
+    .btn-danger:hover {
+        background: var(--danger-color);
+        color: white;
+    }
+
+.btn-success {
+    background: var(--success-color);
+    color: white;
+}
+
+/* 通用表格樣式 */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+    .data-table th {
+        background: #fcfcfc;
+        color: #555;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #eee;
+        font-weight: 600;
+    }
+
+    .data-table td {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+        vertical-align: middle;
+    }
+
+    .data-table tr:hover {
+        background-color: #f8f9fa;
+    }
+
+/* 通用標籤 */
+.tag {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.tag-success {
+    background: #e8f5e9;
+    color: var(--success-color);
+}
+
+.tag-warning {
+    background: #fff3e0;
+    color: var(--warning-color);
+}
+
+.tag-danger {
+    background: #ffebee;
+    color: var(--danger-color);
+}
+
+.tag-info {
+    background: #e3f2fd;
+    color: var(--info-color);
+}
+
+/* 表單樣式 */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(0, 90, 135, 0.1);
+    }
+
+/* RWD 響應式設計 */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: var(--sidebar-width) !important;
+    }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+    .sidebar-overlay.show {
+        display: block;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+    }
+
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .sidebar .menu-text {
+        display: inline !important;
+    }
+
+    .sidebar .menu-item {
+        justify-content: flex-start !important;
+        padding: 12px 16px !important;
+        margin: 4px 12px !important;
+    }
+
+        .sidebar .menu-item i {
+            margin-right: 12px !important;
+        }
+
+    .sidebar .submenu-toggle {
+        justify-content: space-between !important;
+    }
+
+        .sidebar .submenu-toggle .chevron {
+            display: inline-block !important;
+        }
+
+    .sidebar .submenu.show {
+        display: block !important;
+    }
+
+    .header-logo {
+        width: auto;
+    }
+
+        .header-logo .logo-text {
+            display: none;
+        }
+}
+
+@media (max-width: 768px) {
+    .top-header {
+        padding: 0 16px;
+    }
+
+    .header-right span:not(.header-user) {
+        display: none;
+    }
+
+    .main-content {
+        padding: 16px;
+    }
+
+    .page-title {
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-user span {
+        display: none;
+    }
+}

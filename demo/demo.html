@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<!-- [backend-design] 元件展示頁:雙擊即可用瀏覽器開(免 server)。
+     載入順序與真實後台一致:base.css → b_tokens.css → b_admin.css → dropdown.css。
+     右上可切深色模式(data-color-mode)與換主色,驗證 token 全部走 CSS 變數。 -->
+<html lang="zh-Hant" data-color-mode="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>backend-design UI Kit — Demo</title>
+<link rel="stylesheet" href="../static/css/cms/base.css">
+<link rel="stylesheet" href="../static/css/cms/b_tokens.css">
+<link rel="stylesheet" href="../static/css/cms/b_admin.css">
+<link rel="stylesheet" href="../static/css/b/dropdown.css">
+<style>
+  /* 主色(換色只改這裡;--b-chrome 是 brand token 家族的來源) */
+  :root {
+    --b-primary: #173226;
+    --b-chrome: #173226;
+    --b-on-primary: #ffffff;
+    --primary-color: var(--brand);
+    --primary-dark: var(--brand-strong);
+  }
+  /* demo 專用外框(不用外殼 sidebar,自己置中) */
+  body { background: var(--neutral-secondary-soft); margin: 0; font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif; }
+  .demo-wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  .demo-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .demo-h1 { font-size: 24px; font-weight: 600; color: var(--text-heading); margin: 0; }
+  .demo-sub { font-size: 14px; color: var(--text-body-subtle); margin: 4px 0 0; }
+  .demo-sec { margin-top: 40px; }
+  .demo-sec > h2 { font-size: 18px; font-weight: 600; color: var(--text-heading); margin: 0 0 4px; }
+  .demo-sec > p.hint { font-size: 13px; color: var(--text-body-subtle); margin: 0 0 16px; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .sw { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-body); }
+  .sw i { width: 36px; height: 36px; border-radius: var(--radius-md); border: 1px solid var(--border-default); flex-shrink: 0; }
+  .sw code { font-size: 12px; color: var(--text-body-subtle); }
+  .shadow-tile { background: var(--neutral-primary); border-radius: var(--radius-md); padding: 18px 14px; font-size: 13px; color: var(--text-body); text-align: center; }
+</style>
+</head>
+<body>
+<div class="demo-wrap">
+
+  <div class="demo-topbar">
+    <div>
+      <h1 class="demo-h1">backend-design UI Kit</h1>
+      <p class="demo-sub">typeui Dashboard token + 元件 + 動畫 — 全部吃 CSS 變數,右邊按鈕現場驗證。</p>
+    </div>
+    <div class="demo-row" style="margin:0">
+      <div class="b-seg">
+        <button type="button" class="active" onclick="setColor('#173226', this)">墨綠</button>
+        <button type="button" onclick="setColor('#1447E6', this)">系統藍</button>
+        <button type="button" onclick="setColor('#7c2d12', this)">磚紅</button>
+      </div>
+      <button class="b-btn b-btn-dark" onclick="toggleDark()">🌗 深色切換</button>
+    </div>
+  </div>
+
+  <section class="demo-sec">
+    <h2>Color tokens</h2>
+    <p class="hint">brand 家族由 --b-chrome 衍生(color-mix),換主色/深色全站自動跟。</p>
+    <div class="demo-grid">
+      <div class="sw"><i style="background:var(--brand)"></i><span>brand<br><code>--brand</code></span></div>
+      <div class="sw"><i style="background:var(--brand-softer)"></i><span>brand-softer<br><code>--brand-softer</code></span></div>
+      <div class="sw"><i style="background:var(--brand-strong)"></i><span>brand-strong<br><code>--brand-strong</code></span></div>
+      <div class="sw"><i style="background:var(--neutral-primary-soft)"></i><span>neutral-primary-soft<br><code>頁/卡片底</code></span></div>
+      <div class="sw"><i style="background:var(--neutral-tertiary)"></i><span>neutral-tertiary<br><code>--neutral-tertiary</code></span></div>
+      <div class="sw"><i style="background:var(--success)"></i><span>success<br><code>--success</code></span></div>
+      <div class="sw"><i style="background:var(--danger)"></i><span>danger<br><code>--danger</code></span></div>
+      <div class="sw"><i style="background:var(--warning)"></i><span>warning<br><code>--warning</code></span></div>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Shadows(elevation)</h2>
+    <div class="demo-grid">
+      <div class="shadow-tile" style="box-shadow:var(--shadow-xs)">shadow-xs(淺卡)</div>
+      <div class="shadow-tile" style="box-shadow:var(--shadow-sm)">shadow-sm</div>
+      <div class="shadow-tile" style="box-shadow:var(--shadow-md)">shadow-md(卡片/下拉)</div>
+      <div class="shadow-tile" style="box-shadow:var(--shadow-xl)">shadow-xl(modal)</div>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Buttons(.b-btn)</h2>
+    <p class="hint">hover 有 glint 掃光;每顆都有 hover / focus / disabled 三態。</p>
+    <div class="demo-row">
+      <button class="b-btn b-btn-primary">主要動作</button>
+      <button class="b-btn b-btn-success">成功</button>
+      <button class="b-btn b-btn-danger">危險</button>
+      <button class="b-btn b-btn-danger-soft">危險(soft)</button>
+      <button class="b-btn b-btn-dark">深色</button>
+      <button class="b-btn b-btn-ghost">Ghost</button>
+      <button class="b-btn b-btn-quiet">Quiet</button>
+      <button class="b-btn b-btn-primary" disabled>Disabled</button>
+    </div>
+    <div class="demo-row">
+      <button class="b-btn b-btn-primary b-btn-xs">xs</button>
+      <button class="b-btn b-btn-primary b-btn-sm">sm</button>
+      <button class="b-btn b-btn-primary">base</button>
+      <button class="b-btn b-btn-primary b-btn-lg">lg</button>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Badges(.b-badge)</h2>
+    <div class="demo-row">
+      <span class="b-badge ok"><span class="dot"></span>已確認</span>
+      <span class="b-badge warn"><span class="dot"></span>待確認</span>
+      <span class="b-badge bad"><span class="dot"></span>付款失敗</span>
+      <span class="b-badge brand"><span class="dot"></span>品牌</span>
+      <span class="b-badge neutral"><span class="dot"></span>已取消</span>
+      <span class="b-badge dark"><span class="dot"></span>Dark</span>
+      <span class="b-badge ok square">square</span>
+      <span class="b-badge warn lg"><span class="dot"></span>lg 尺寸</span>
+      <span class="b-alert-pill">逾時未指派</span>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Inputs / 自訂下拉(.b-input / .b-dd)</h2>
+    <p class="hint">下方 select 由 dropdown.js 自動增強成 .b-dd(保留原生 submit/required;展開動畫 bddIn)。</p>
+    <div class="demo-row" style="align-items:flex-end">
+      <div>
+        <label class="b-label" for="d-name">姓名</label>
+        <input id="d-name" class="b-input" placeholder="輸入姓名">
+      </div>
+      <div>
+        <label class="b-label" for="d-status">狀態</label>
+        <select id="d-status" class="b-select">
+          <option value="">全部狀態</option>
+          <option value="pending" selected>待確認</option>
+          <option value="confirmed">已確認</option>
+          <option value="cancelled">已取消</option>
+        </select>
+      </div>
+      <div>
+        <label class="b-label" for="d-lock">鎖定的欄位</label>
+        <input id="d-lock" class="b-input" value="不可編輯" disabled>
+      </div>
+    </div>
+    <div>
+      <label class="b-label" for="d-note">備註</label>
+      <textarea id="d-note" class="b-textarea" rows="2" placeholder="多行輸入…"></textarea>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>KPI 卡(.b-kpi)</h2>
+    <div class="b-kpi-grid">
+      <div class="b-kpi"><div class="b-kpi-head"><span class="b-kpi-label">今日預約組數</span><span class="b-kpi-icon"><i data-lucide="calendar-check"></i></span></div><div class="b-kpi-value num">128</div></div>
+      <div class="b-kpi"><div class="b-kpi-head"><span class="b-kpi-label">待確認</span><span class="b-kpi-icon"><i data-lucide="clock"></i></span></div><div class="b-kpi-value num">6</div></div>
+      <div class="b-kpi"><div class="b-kpi-head"><span class="b-kpi-label">線上已付款</span><span class="b-kpi-icon"><i data-lucide="credit-card"></i></span></div><div class="b-kpi-value num">97</div></div>
+      <div class="b-kpi"><div class="b-kpi-head"><span class="b-kpi-label">現場付款</span><span class="b-kpi-icon"><i data-lucide="map-pin"></i></span></div><div class="b-kpi-value num">25</div></div>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Card + Table + Pagination(.b-card / .b-tbl / .b-pagination)</h2>
+    <section class="b-card" style="overflow:hidden">
+      <div class="b-card-head">
+        <h3 class="b-card-title">最近預約</h3>
+        <button class="b-btn b-btn-ghost b-btn-sm">查看全部 <i data-lucide="arrow-right"></i></button>
+      </div>
+      <div class="b-tbl-wrap" style="border:0;border-radius:0;box-shadow:none;">
+        <table class="b-tbl">
+          <thead><tr><th>日期</th><th>開球</th><th>姓名</th><th class="num">人數</th><th>狀態</th><th>付款</th></tr></thead>
+          <tbody>
+            <tr><td class="num">2026-07-27</td><td class="num">07:30</td><td>王小明</td><td class="num">4</td><td><span class="b-badge ok"><span class="dot"></span>已確認</span></td><td><span class="b-badge ok"><span class="dot"></span>已付款</span></td></tr>
+            <tr><td class="num">2026-07-27</td><td class="num">08:10</td><td>陳美華</td><td class="num">3</td><td><span class="b-badge warn"><span class="dot"></span>待確認</span></td><td><span class="b-badge warn"><span class="dot"></span>未付款</span></td></tr>
+            <tr><td class="num">2026-07-27</td><td class="num">09:00</td><td>林大同</td><td class="num">2</td><td><span class="b-badge neutral"><span class="dot"></span>已取消</span></td><td><span class="b-badge bad"><span class="dot"></span>付款失敗</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="b-card-body" style="display:flex;justify-content:flex-end">
+        <nav class="b-pagination">
+          <button><i data-lucide="chevron-left"></i></button>
+          <button class="active">1</button><button>2</button><button>3</button>
+          <button><i data-lucide="chevron-right"></i></button>
+        </nav>
+      </div>
+    </section>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Tabs / Seg(.b-tabs / .b-seg)</h2>
+    <div class="b-tabs" role="tablist">
+      <button class="b-tab b-tab-active" onclick="pickTab(this,'p1')">開球時段</button>
+      <button class="b-tab" onclick="pickTab(this,'p2')">價格設定</button>
+      <button class="b-tab" onclick="pickTab(this,'p3')">排程</button>
+    </div>
+    <div id="p1" class="b-panel" style="padding:16px 4px;color:var(--text-body);font-size:14px">Tab 面板一:底線式 tab,active 用 brand 色。</div>
+    <div id="p2" class="b-panel" hidden style="padding:16px 4px;color:var(--text-body);font-size:14px">Tab 面板二。</div>
+    <div id="p3" class="b-panel" hidden style="padding:16px 4px;color:var(--text-body);font-size:14px">Tab 面板三。</div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Alerts / Empty state(.b-alert / .b-empty)</h2>
+    <div style="display:grid;gap:12px;max-width:640px">
+      <div class="b-alert brand"><div><p class="b-alert-title">提示</p>系統將於今晚 23:00 進行維護。</div></div>
+      <div class="b-alert success"><div><p class="b-alert-title">已儲存</p>時段設定已更新。</div></div>
+      <div class="b-alert warning"><div><p class="b-alert-title">注意</p>尚有 3 筆預約未指派桿弟。</div></div>
+      <div class="b-alert danger"><div><p class="b-alert-title">失敗</p>付款回呼驗證失敗,請重試。</div></div>
+    </div>
+    <div class="b-card" style="margin-top:16px">
+      <div class="b-empty">
+        <span class="b-empty-icon"><i data-lucide="inbox"></i></span>
+        <p class="b-empty-title">目前沒有預約</p>
+        <p class="b-empty-sub">當客人完成預約後,資料會即時出現在這裡。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Icon shapes / Avatars(.b-ish / .b-avatar)</h2>
+    <div class="demo-row">
+      <span class="b-ish b-ish-md b-ish-circle brand"><i data-lucide="flag"></i></span>
+      <span class="b-ish b-ish-md b-ish-circle success"><i data-lucide="check"></i></span>
+      <span class="b-ish b-ish-md b-ish-circle warning"><i data-lucide="bell"></i></span>
+      <span class="b-ish b-ish-md b-ish-square danger"><i data-lucide="triangle-alert"></i></span>
+      <span class="b-ish b-ish-md b-ish-square gray"><i data-lucide="settings"></i></span>
+      <span class="b-avatar b-avatar-sm">王</span>
+      <span class="b-avatar">陳美</span>
+      <span class="b-avatar b-avatar-lg b-avatar-square">林</span>
+    </div>
+  </section>
+
+  <section class="demo-sec">
+    <h2>Toast / Modal(動畫)</h2>
+    <p class="hint">toast 走 @keyframes b-toast-life(滑入→停留→滑出自動移除);modal 淡入淡出 is-visible + is-open。</p>
+    <div class="demo-row">
+      <button class="b-btn b-btn-primary" onclick="fireToast('success','已儲存變更')">成功 toast</button>
+      <button class="b-btn b-btn-danger-soft" onclick="fireToast('danger','儲存失敗,請重試')">失敗 toast</button>
+      <button class="b-btn b-btn-ghost" onclick="fireToast('warning','尚有欄位未填')">警告 toast</button>
+      <button class="b-btn b-btn-dark" onclick="openModal()">開啟 modal(is-soft is-wide)</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- Modal 範例(markup 同 _components.html 的 form_modal macro) -->
+<div class="b-modal-overlay" id="demo-modal" role="dialog" aria-modal="true">
+  <div class="b-modal is-soft is-wide">
+    <div class="b-modal-head">
+      <h2 class="b-modal-title">新增預約</h2>
+      <button type="button" class="b-modal-close" onclick="closeModal()" aria-label="關閉"><i data-lucide="x"></i></button>
+    </div>
+    <div class="b-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px">
+      <div><label class="b-label">姓名</label><input class="b-input" placeholder="必填"></div>
+      <div><label class="b-label">人數</label>
+        <select class="b-select"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+      </div>
+      <div><label class="b-label">日期</label><input class="b-input" value="2026-07-28"></div>
+      <div><label class="b-label">開球時間</label>
+        <select class="b-select"><option>07:30</option><option>08:10</option></select>
+      </div>
+    </div>
+    <div class="b-modal-foot"><button class="b-btn b-btn-primary" onclick="closeModal()">儲存</button></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="../static/js/b/dropdown.js"></script>
+<script>
+  function paint() { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 2.2, 'aria-hidden': 'true' } }); }
+  paint();
+
+  function toggleDark() {
+    var el = document.documentElement;
+    el.setAttribute('data-color-mode', el.getAttribute('data-color-mode') === 'dark' ? 'light' : 'dark');
+  }
+  function setColor(hex, btn) {
+    document.documentElement.style.setProperty('--b-primary', hex);
+    document.documentElement.style.setProperty('--b-chrome', hex);
+    btn.parentNode.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
+  }
+  function pickTab(btn, id) {
+    document.querySelectorAll('.b-tab').forEach(function (t) { t.classList.toggle('b-tab-active', t === btn); });
+    ['p1', 'p2', 'p3'].forEach(function (p) { document.getElementById(p).hidden = (p !== id); });
+  }
+  function fireToast(kind, msg) {
+    var wrap = document.querySelector('.b-toast-wrap');
+    if (!wrap) { wrap = document.createElement('div'); wrap.className = 'b-toast-wrap'; wrap.setAttribute('role', 'status'); document.body.appendChild(wrap); }
+    var icons = { success: 'circle-check', danger: 'circle-x', warning: 'triangle-alert' };
+    var t = document.createElement('div');
+    t.className = 'b-toast b-toast-' + kind;
+    t.innerHTML = '<span class="b-toast-icon"><i data-lucide="' + icons[kind] + '"></i></span><span class="b-toast-msg">' + msg + '</span>';
+    wrap.appendChild(t); paint();
+    t.addEventListener('animationend', function () { t.remove(); if (!wrap.children.length) wrap.remove(); });
+  }
+  var modal = document.getElementById('demo-modal');
+  function openModal() { modal.classList.add('is-visible'); requestAnimationFrame(function () { requestAnimationFrame(function () { modal.classList.add('is-open'); }); }); }
+  function closeModal() {
+    modal.classList.remove('is-open');
+    setTimeout(function () { modal.classList.remove('is-visible'); }, 140);
+  }
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+{# Reusable B/C course-admin presentation macros.
+   Import with:
+   {% import "cms/b_admin/_components.html" as ui with context %}
+#}
+
+{% macro action_button(label, icon='', modal_id='', href='', variant='primary', type='button', extra_class='', attrs='') -%}
+    {% set classes = ('b-btn b-btn-' ~ variant ~ ' ' ~ extra_class).strip() %}
+    {% if href %}
+        <a href="{{ href }}" class="{{ classes }}" {{ attrs|safe }}>
+            {% if icon %}<i data-lucide="{{ icon }}" aria-hidden="true"></i>{% endif %}
+            <span>{{ label }}</span>
+        </a>
+    {% else %}
+        <button type="{{ type }}" class="{{ classes }}" {% if modal_id %}data-modal-open="{{ modal_id }}"{% endif %} {{ attrs|safe }}>
+            {% if icon %}<i data-lucide="{{ icon }}" aria-hidden="true"></i>{% endif %}
+            <span>{{ label }}</span>
+        </button>
+    {% endif %}
+{%- endmacro %}
+
+{% macro form_modal(id, title, action, method='post', wide=True, soft=True, submit_label='儲存', submit_variant='text', require_fill=False, body_class='grid grid-cols-2 gap-3', form_attrs='') -%}
+<div class="b-modal-overlay" id="{{ id }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-title">
+    <div class="b-modal{% if soft %} is-soft{% endif %}{% if wide %} is-wide{% endif %}">
+        <div class="b-modal-head">
+            <h2 class="b-modal-title" id="{{ id }}-title">{{ title }}</h2>
+            <button type="button" class="b-modal-close" data-modal-close aria-label="關閉">
+                <i data-lucide="x" aria-hidden="true"></i>
+            </button>
+        </div>
+        <form method="{{ method }}" action="{{ action }}" {{ form_attrs|safe }}>
+            {% if method|lower == 'post' %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% endif %}
+            <div class="b-modal-body {{ body_class }}">
+                {{ caller() }}
+            </div>
+            <div class="b-modal-foot">
+                <button class="b-btn b-btn-{{ submit_variant }}" {% if require_fill %}data-require-fill disabled{% endif %}>{{ submit_label }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro field(name, label, type='text', value='', placeholder='', required=False, span='', control_class='b-input', attrs='') -%}
+<label class="b-label {{ span }}">
+    {{ label }}{% if required %} *{% endif %}
+    <input
+        type="{{ type }}"
+        name="{{ name }}"
+        {% if value is not none %}value="{{ value }}"{% endif %}
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        class="{{ control_class }}"
+        {% if required %}required{% endif %}
+        {{ attrs|safe }}
+    >
+</label>
+{%- endmacro %}
+
+{% macro textarea_field(name, label, value='', placeholder='', required=False, span='', attrs='') -%}
+<label class="b-label {{ span }}">
+    {{ label }}{% if required %} *{% endif %}
+    <textarea
+        name="{{ name }}"
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        class="b-textarea"
+        {% if required %}required{% endif %}
+        {{ attrs|safe }}
+    >{{ value }}</textarea>
+</label>
+{%- endmacro %}
+
+{% macro select_field(name, label, options, selected='', placeholder='', required=False, span='', attrs='') -%}
+<label class="b-label {{ span }}">
+    {{ label }}{% if required %} *{% endif %}
+    <select name="{{ name }}" class="b-select" {% if required %}required{% endif %} {{ attrs|safe }}>
+        {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+        {% for value, text in options %}
+        <option value="{{ value }}" {{ 'selected' if value|string == selected|string }}>{{ text }}</option>
+        {% endfor %}
+    </select>
+</label>
+{%- endmacro %}
+
+{% macro toolbar(method='get', class_name='mb-4 flex flex-wrap gap-2', attrs='') -%}
+<form method="{{ method }}" class="{{ class_name }}" {{ attrs|safe }}>
+    {{ caller() }}
+</form>
+{%- endmacro %}
+
+{# 篩選下拉面板:右上角「篩選」按鈕(放 page_actions)向下展開 .b-pop 面板,內含篩選欄位。
+   貼著按鈕下方展開(非置中 modal),點外面 / Esc 收起(base.html 的 .b-pop JS 接管)。
+   GET 送出(URL query),不改後端行為。重置鈕導回不帶 query 的同頁(回到全部)。
+   用法(一個 macro 搞定觸發鈕 + 面板,放在 page_actions 內):
+     {% block page_actions %}
+     {% call ui.filter_panel(action=url_for('...'), active=request.args) %}
+         ...欄位(label > select)...
+     {% endcall %}
+     {% endblock %}
+#}
+{% macro filter_panel(label='篩選', action='', method='get', active=None, panel_class='', reset_href='', submit_label='套用篩選') -%}
+    {# active = request.args(或 dict);算「有值」的篩選數,顯示在鈕上的 badge #}
+    {% set count = active.values()|reject('equalto', '')|list|length if active else 0 %}
+    <div class="b-pop">
+        <button type="button" class="b-btn b-btn-filter{% if count %} is-active{% endif %}" data-pop aria-haspopup="true" aria-expanded="false">
+            <i data-lucide="list-filter" aria-hidden="true"></i>
+            <span>{{ label }}</span>
+        </button>
+        <div class="b-pop-panel {{ panel_class }}">
+            {# data-filter-form:b-filter.js 攔截 submit → AJAX 換表格區(無整頁重整)。
+               降級:沒 JS 時就是普通 GET 表單,行為不變。 #}
+            <form method="{{ method }}" action="{{ action }}" data-filter-form>
+                <div class="grid grid-cols-1 gap-3">
+                    {{ caller() }}
+                </div>
+                <div class="b-pop-foot">
+                    <a href="{{ reset_href or action }}" class="b-btn-reset">重置</a>
+                    <button type="submit" class="b-btn b-btn-primary b-btn-sm">{{ submit_label }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{%- endmacro %}
+
+{% macro table(headers, wrapper_class='') -%}
+{# data-filter-target:篩選 AJAX(b-filter.js)抽換的目標容器 #}
+<div class="b-tbl-scroll {{ wrapper_class }}" data-filter-target>
+    <table class="b-tbl">
+        <thead>
+            <tr>
+                {% for header in headers %}
+                <th class="px-3 py-2">{{ header }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {{ caller() }}
+        </tbody>
+    </table>
+</div>
+{%- endmacro %}
+
+{% macro empty_row(colspan, text) -%}
+<tr>
+    <td colspan="{{ colspan }}" class="px-3 py-6 text-center text-gray-500">{{ text }}</td>
+</tr>
+{%- endmacro %}
+
+{% macro badge(label, tone='neutral', dot=True, extra_class='') -%}
+<span class="b-badge {{ tone }} {{ extra_class }}">
+    {% if dot %}<span class="dot"></span>{% endif %}
+    {{ label }}
+</span>
+{%- endmacro %}
+
+{% macro auto_select(name, options, selected='', action='', hidden={}, attrs='') -%}
+<form method="post" action="{{ action }}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for key, value in hidden.items() %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <select name="{{ name }}" onchange="this.form.submit()" class="b-select" {{ attrs|safe }}>
+        {% for value, text in options %}
+        <option value="{{ value }}" {{ 'selected' if value|string == selected|string }}>{{ text }}</option>
+        {% endfor %}
+    </select>
+</form>
+{%- endmacro %}

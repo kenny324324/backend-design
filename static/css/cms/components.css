@@ -1,0 +1,869 @@
+/* CMS 後台子頁面共用元件樣式 — typeui token 映射層
+   ----------------------------------------------------------------------------
+   2026-07-02 模擬器後台(A 端 /cms)翻新:舊 class(.btn / .form-* / .data-table /
+   .status-tag / DataTables …)全部重新映射到 b_tokens.css 的 token,視覺對齊
+   b_admin.css 的 .b-* 元件(同圓角 / 陰影 / 三態 / 深淺色自動)。
+   鐵則:不寫裸 hex,一律 var(--token);載入順序在 b_admin.css 之後(extra_css)。 */
+
+/* ==================== 按鈕(對齊 .b-btn 家族) ==================== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: var(--control-height, 36px);
+    min-height: var(--control-height, 36px);
+    padding: 0 var(--control-pad-x, 14px);
+    border-radius: var(--control-radius, 10px);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: calc(var(--control-height, 36px) - 2px);
+    border: 1px solid var(--border-default);
+    background: var(--neutral-primary-soft);
+    color: var(--text-body);
+    box-shadow: var(--shadow-xs), var(--btn-glint);
+    cursor: pointer;
+    white-space: nowrap;
+    box-sizing: border-box;
+    text-decoration: none;
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.btn:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.btn:focus-visible { outline: none; box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--neutral-tertiary-medium); }
+
+.btn-primary { background: var(--brand); border-color: transparent; color: var(--b-on-primary, #fff); }
+.btn-primary:hover { background: var(--brand-strong); color: var(--b-on-primary, #fff); }
+.btn-primary:focus-visible { box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--brand-medium); }
+
+.btn-outline { background: var(--neutral-primary-soft); border-color: var(--border-default); color: var(--text-body); }
+.btn-outline:hover { background: var(--neutral-secondary-medium); border-color: var(--border-default-strong); color: var(--text-heading); }
+
+.btn-success { background: var(--success); border-color: transparent; color: #fff; }
+.btn-success:hover { background: var(--success-strong); color: #fff; }
+.btn-success:focus-visible { box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--success-medium); }
+
+/* 危險但不搶眼(對齊 .b-btn-danger-soft):淡紅底紅字紅框、無陰影 */
+.btn-danger { background: var(--danger-soft); border-color: var(--border-danger-subtle); color: var(--fg-danger-strong); box-shadow: none; }
+.btn-danger:hover { background: var(--danger-medium); border-color: var(--border-danger); color: var(--fg-danger-strong); }
+.btn-danger:focus-visible { box-shadow: 0 0 0 4px var(--danger-medium); }
+
+.btn:disabled, .btn.is-disabled, .btn[aria-disabled="true"] {
+    background: var(--disabled);
+    border-color: var(--border-default-medium);
+    color: var(--fg-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.btn:disabled:hover { background: var(--disabled); color: var(--fg-disabled); }
+
+/* ==================== DataTable 自定義 ==================== */
+
+.dataTables_wrapper { font-size: 14px; color: var(--text-body); }
+
+/* DataTables 動態生成的 select 不會被 BDropdown 增強:
+   解除 b_admin.css 的 FOUC 隱藏(select:not([data-bdd]) visibility:hidden),
+   維持原生但吃 .main-content 的欄位 retrofit(同高同框)。 */
+.dataTables_wrapper select:not([data-bdd]) { visibility: visible; }
+.dataTables_wrapper .dataTables_length select {
+    width: auto;
+    min-width: 72px;
+    margin: 0 8px;
+}
+.dataTables_wrapper .dataTables_filter input { margin-left: 8px; width: 220px; }
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter { margin-bottom: 12px; }
+.dataTables_wrapper .dataTables_info { color: var(--text-body-subtle); padding: 14px 0; font-size: 13px; }
+
+.dataTables_wrapper .dataTables_paginate { padding-top: 8px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    margin: 0 3px;
+    cursor: pointer;
+    background: var(--neutral-primary-soft);
+    color: var(--text-body) !important;
+    box-shadow: var(--shadow-2xs);
+    transition: background .15s, color .15s;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: var(--neutral-tertiary-medium);
+    color: var(--fg-brand) !important;
+    border-color: var(--border-default);
+    font-weight: 500;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current):not(.disabled) {
+    background: var(--neutral-secondary-medium);
+    color: var(--text-heading) !important;
+    border-color: var(--border-default);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+    color: var(--fg-disabled) !important;
+    cursor: not-allowed;
+    box-shadow: none;
+    background: var(--neutral-primary-soft);
+}
+
+/* ==================== 表格(對齊 .b-tbl;含 DataTables / .data-table / .file-list-table) ==================== */
+
+table.dataTable thead th,
+.data-table th,
+.file-list-table th {
+    background: var(--neutral-secondary-soft);
+    color: var(--text-body);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-default);
+    white-space: nowrap;
+}
+table.dataTable tbody td,
+.data-table td,
+.file-list-table td {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--text-heading);
+    border-bottom: 1px solid var(--border-default);
+    vertical-align: middle;
+}
+table.dataTable tbody tr:hover,
+.data-table tbody tr:hover,
+.file-list-table tbody tr:hover {
+    background: var(--neutral-secondary-medium);
+}
+table.dataTable tbody tr:last-child td,
+.data-table tbody tr:last-child td,
+.file-list-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+.data-table, .file-list-table { width: 100%; border-collapse: collapse; }
+/* DataTables 1.13 預設在 thead th 加 border-bottom 2px;壓回 1px 淡線 */
+table.dataTable.no-footer { border-bottom: 1px solid var(--border-default); }
+
+/* 欄位對齊(同 .b-tbl 慣例):數字欄 .num 含表頭一律靠右 + 等寬數字;
+   排序箭頭吃掉表頭右緣 → th/td 同步留 26px,讓數字與表頭文字右緣對齊 */
+table.dataTable th.num,
+table.dataTable td.num,
+.data-table th.num,
+.data-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    padding-right: 26px;
+}
+/* 名稱主欄:保底寬度,避免被固定寬度欄擠到窄折行 */
+table.dataTable th.col-name,
+table.dataTable td.col-name { min-width: 180px; }
+table.dataTable td.col-name { color: var(--text-heading); font-weight: var(--b-font-section, 500); }
+/* 操作欄:按鈕固定單行,不隨欄寬折行 */
+table.dataTable td.col-actions { white-space: nowrap; }
+
+/* ==================== Form Input(對齊 .b-input 欄位參數) ==================== */
+
+.form-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    height: var(--field-height, 36px);
+    min-height: var(--field-height, 36px);
+    padding: 0 var(--field-pad-x, 12px);
+    line-height: calc(var(--field-height, 36px) - 2px);
+    border: 1px solid var(--border-default-medium);
+    border-radius: var(--field-radius, 10px);
+    background: var(--neutral-secondary-medium);
+    color: var(--text-heading);
+    font-size: var(--field-font-size, 14px);
+    font-family: inherit;
+    box-shadow: var(--shadow-xs);
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+textarea.form-input { height: auto; min-height: 80px; padding: 10px var(--field-pad-x, 12px); line-height: 1.5; }
+.form-input:hover { border-color: var(--border-default-strong); }
+.form-input:focus {
+    outline: none;
+    border-color: var(--border-brand);
+    box-shadow: 0 0 0 1px var(--brand);
+}
+.form-input:disabled,
+.form-input.readonly {
+    background: var(--disabled);
+    color: var(--fg-disabled);
+    box-shadow: none;
+}
+.form-input.error { border-color: var(--border-danger); }
+.form-input.error:focus { box-shadow: 0 0 0 1px var(--danger); }
+.form-error { color: var(--fg-danger); font-size: 12px; margin-top: 4px; }
+.form-hint { color: var(--text-body-subtle); font-size: 12px; margin-top: 4px; }
+
+/* ── Modal 表單 2 欄格線(寬扁 modal 用;桌機)──────────────────────────
+   欄距 16;列距沿用 .form-group 自身 margin-bottom(16px),故只設 column-gap 避免雙重間距。
+   整列欄位(checkbox 清單、權限樹等)加 .col-span-2 橫跨兩欄。 */
+.b-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
+.b-form-grid > .col-span-2 { grid-column: 1 / -1; }
+
+/* 後台自訂下拉「展開」過場加明顯一點:select 增強成 .b-dd 後,點開 .b-dd-menu 由上往下展開(位移+微縮放)。
+   只作用於後台 .main-content 內(特異度 0,2,0 > dropdown.css 的 .b-dd-menu 0,1,0),前台維持 dropdown.css 原本的 bddIn 不變。 */
+.main-content .b-dd-menu {
+    transform-origin: top center;
+    animation: bddInBack .2s cubic-bezier(.16, 1, .3, 1);
+}
+@keyframes bddInBack {
+    from { opacity: 0; transform: translateY(-10px) scaleY(.94); }
+    to   { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+/* ── 內容管理:大 modal 左右兩欄(左 標題/排序/附件,右 TinyMCE);桌機,不分步、不捲頁 ──
+   ★ 徹底等高做法:modal 固定高 → body flex:1 → grid 單列 minmax(0,1fr) 吃滿 body 高
+   → 左右兩欄一律 = body 高度(不靠內容/編輯器高度驅動,消除 TinyMCE toolbar/statusbar 造成的高度差)。 */
+.b-modal.content-edit-modal {
+    width: 100%; max-width: min(1120px, 94vw);
+    height: min(620px, calc(100vh - 48px));
+    display: flex; flex-direction: column;
+}
+.b-modal.content-edit-modal > .b-modal-head,
+.b-modal.content-edit-modal > .b-modal-foot { flex: 0 0 auto; }
+.content-edit-body {
+    flex: 1 1 auto; min-height: 0;
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);      /* 單列吃滿 body 高 → 左右欄同高 */
+    gap: 22px;
+}
+.content-edit-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; }
+.content-edit-side > .form-group { margin-bottom: 0; }
+.content-edit-files { display: flex; flex-direction: column; flex: 1; min-height: 0; }  /* 附件區吃左欄剩餘高度 */
+.content-edit-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.content-edit-main > .form-label { margin-bottom: 6px; }
+.content-edit-main .editor-container {
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 0;                       /* 覆蓋全域 editor-container margin,否則右欄會比左欄短 20px */
+    display: flex;
+    flex-direction: column;
+}
+.content-edit-main .tox-tinymce {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100% !important;                /* TinyMCE 外框跟著右欄填滿,內文超出時由 editor 自己捲 */
+}
+.content-edit-main .tox-editor-container,
+.content-edit-main .tox-edit-area { min-height: 0; }
+
+/* 附件:標籤列(標籤左 + 「上傳」文字鈕右)+ 附件框(吃剩餘高 → 與固定高編輯器等高、內滾、可拖放、空狀態) */
+.content-files-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* 上傳:純文字按鈕 — 無底色/框/陰影,hover 文字由淺灰亮成 brand(使用者:文字亮起、不要底色) */
+.content-files-upload {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: none; border: 0; box-shadow: none; padding: 4px;
+    font: inherit; font-size: 0.86rem; font-weight: 500;
+    color: var(--text-body-subtle); cursor: pointer;
+    transition: color .15s;
+}
+.content-files-upload:hover { color: var(--brand); }
+.content-files-upload:active { color: var(--brand-strong); }
+.content-files-upload:focus-visible { outline: 2px solid var(--brand-medium); outline-offset: 2px; border-radius: 4px; }
+.content-files-box {
+    margin-top: 8px;
+    flex: 1; min-height: 0;                 /* 吃左欄剩餘高度 → 與右邊固定高編輯器等高 */
+    overflow-y: auto;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+    padding: 5px;
+    display: flex; flex-direction: column; gap: 2px;
+}
+.content-files-box.is-dragover { border-color: var(--border-brand); background: var(--brand-softer); }
+.content-file-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: var(--radius-sm);
+    font-size: 0.86rem; transition: background-color .12s;
+}
+.content-file-item:hover { background: var(--neutral-secondary-medium); }
+.content-file-icon { color: var(--text-body-subtle); flex-shrink: 0; width: 16px; text-align: center; }
+.content-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body); }
+.content-file-pct { flex-shrink: 0; color: var(--text-body-subtle); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.content-file-act {
+    flex-shrink: 0; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--text-body-subtle); cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+.content-file-act:hover { background: var(--neutral-tertiary); color: var(--text-heading); }
+.content-file-act.is-danger:hover { background: var(--danger-soft); color: var(--fg-danger); }
+/* 空狀態:置中填滿框 */
+.content-files-empty {
+    flex: 1; min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: var(--text-body-subtle); font-size: 0.86rem;
+}
+.content-files-empty i { font-size: 1.7rem; opacity: .6; }
+
+/* 窄螢幕保險:兩欄堆疊(球場後台桌機 only,但避免破版) */
+@media (max-width: 900px) { .content-edit-body { grid-template-columns: 1fr; } }
+
+/* ── Checkbox(radios-checkboxes-toggle.md:16px / 4px 圓角 / 1px border-default-medium /
+   勾選 brand 填色 + 白勾 / focus ring 2px brand-soft)。自繪(appearance:none),可重用。 */
+.b-check {
+    appearance: none; -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 16px; height: 16px; margin: 0;
+    border: 1px solid var(--border-default-medium);
+    border-radius: 4px;
+    background: var(--neutral-secondary-medium);
+    cursor: pointer;
+    display: inline-grid; place-content: center;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.b-check::before {
+    content: "";
+    width: 10px; height: 10px;
+    transform: scale(0);
+    transition: transform .12s ease;
+    background-color: var(--b-on-primary, #fff);
+    /* 白勾(mask):打勾 SVG */
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23000' d='M13.5 3.5L6 11 2.5 7.5 1 9l5 5 9-9z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23000' d='M13.5 3.5L6 11 2.5 7.5 1 9l5 5 9-9z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.b-check:hover { border-color: var(--border-default-strong); }
+.b-check:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+.b-check:checked::before { transform: scale(1); }
+.b-check:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--brand-soft, var(--brand-medium));
+}
+.b-check:disabled {
+    border-color: var(--border-default);
+    background: var(--disabled);
+    cursor: not-allowed;
+}
+.b-check:disabled:checked { background: var(--fg-disabled); border-color: var(--fg-disabled); }
+
+/* ⚠️ 雙層下拉修正:BDropdown 把原生 <select class="form-input"> 增強後,
+   會把 form-input 的 class 複製到外層 wrapper(.b-dd.form-input),導致
+   wrapper 自己畫了一層框/底/陰影,再疊上 .b-dd-trigger 的框 → 視覺雙框。
+   → wrapper 只當定位容器,框/底/陰影全交給 trigger 畫(單層)。 */
+.b-dd.form-input {
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    line-height: normal;
+}
+/* trigger 才是視覺主體:對齊 .form-input 的框/底/陰影/圓角 */
+.b-dd.form-input .b-dd-trigger {
+    border: 1px solid var(--border-default-medium);
+    border-radius: var(--field-radius, 10px);
+    background: var(--neutral-secondary-medium);
+    box-shadow: var(--shadow-xs);
+    color: var(--text-heading);
+}
+.b-dd.form-input .b-dd-trigger:hover { border-color: var(--border-default-strong); }
+.b-dd.form-input.open .b-dd-trigger {
+    border-color: var(--border-brand);
+    box-shadow: 0 0 0 1px var(--brand);
+}
+
+/* ==================== Action Buttons(表格列內文字動作) ==================== */
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 5px 9px;
+    border-radius: var(--radius-sm);
+    transition: background .12s, color .12s;
+}
+.action-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--neutral-tertiary-medium); }
+.action-btn.edit { color: var(--fg-brand); }
+.action-btn.edit:hover { background: var(--brand-softer); }
+.action-btn.add,
+.action-btn.enable { color: var(--fg-success); }
+.action-btn.add:hover,
+.action-btn.enable:hover { background: var(--success-soft); }
+.action-btn.delete,
+.action-btn.disable { color: var(--fg-danger); }
+.action-btn.delete:hover,
+.action-btn.disable:hover { background: var(--danger-soft); }
+/* 中性:系統文字色(不帶語意色),hover 淡灰底 */
+.action-btn.neutral { color: var(--text-body); }
+.action-btn.neutral:hover { background: var(--neutral-secondary-medium); }
+
+/* ==================== Status Tags(對齊 .b-badge pill) ==================== */
+
+.status-tag,
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid transparent;
+}
+.status-active,
+.tag-success { background: var(--success-soft); border-color: var(--border-success-subtle); color: var(--fg-success-strong); }
+.status-inactive,
+.tag-danger { background: var(--danger-soft); border-color: var(--border-danger-subtle); color: var(--fg-danger-strong); }
+.tag-warning { background: var(--warning-soft); border-color: var(--border-warning-subtle); color: var(--fg-warning); }
+.tag-info { background: var(--brand-softer); border-color: var(--border-brand-subtle); color: var(--fg-brand-strong); }
+
+/* ==================== Password Toggle ==================== */
+
+.password-wrapper { position: relative; }
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-body-subtle);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+}
+.password-toggle:hover { color: var(--text-body); }
+.password-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--neutral-tertiary-medium); }
+
+/* ==================== Tree Structure(選單/組織管理) ==================== */
+
+.tree-node { padding: 4px 0; }
+.tree-children {
+    margin-left: 24px;
+    padding-left: 16px;
+    border-left: 1px dashed var(--border-default-medium);
+}
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    transition: background-color .15s;
+}
+.tree-item:hover { background-color: var(--neutral-secondary-medium); }
+.tree-toggle {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-body-subtle);
+    flex-shrink: 0;
+}
+.tree-toggle:hover { color: var(--text-heading); }
+.tree-icon { color: var(--fg-brand); }
+.tree-name { font-weight: 500; color: var(--text-heading); }
+.tree-level, .tree-meta { font-size: 12px; color: var(--text-body-subtle); margin-left: 4px; }
+.tree-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.tree-item:hover .tree-actions,
+.tree-item:focus-within .tree-actions { opacity: 1; }
+
+/* ==================== Empty State(對齊 .b-empty) ==================== */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 64px 24px;
+    color: var(--text-body-subtle);
+    font-size: 14px;
+}
+.empty-state i {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: var(--neutral-secondary-soft);
+    color: var(--text-body);
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+.empty-state p { margin-bottom: 16px; }
+
+/* ==================== Role Permission(groups_manage) ==================== */
+
+.roles-container {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-secondary-soft);
+    padding: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+.role-group { margin-bottom: 12px; }
+.role-group:last-child { margin-bottom: 0; }
+.role-parent {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--neutral-primary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+}
+.role-parent input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 10px;
+    accent-color: var(--brand);
+}
+.role-parent label { font-weight: 500; color: var(--text-heading); }
+.role-children {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    margin-left: 24px;
+}
+.role-child { display: flex; align-items: center; }
+.role-child input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    accent-color: var(--brand);
+}
+.role-child label { font-size: 14px; color: var(--text-body); }
+
+/* ==================== Upload & Files(content_manage) ==================== */
+
+.upload-dropzone {
+    border: 1px dashed var(--border-default-strong);
+    border-radius: var(--radius-md);
+    background: var(--neutral-secondary-soft);
+    color: var(--text-body);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.upload-dropzone:hover,
+.upload-dropzone.dragover {
+    border-color: var(--border-brand);
+    background: var(--brand-softer);
+}
+.upload-progress-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--neutral-secondary-soft);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--text-body);
+}
+.editor-container { margin-bottom: 20px; }
+
+/* ==================== Profile Form(user_profile) ==================== */
+
+.profile-form { max-width: 600px; }
+.form-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 16px;
+}
+.form-row label {
+    font-weight: 500;
+    color: var(--text-heading);
+    font-size: 14px;
+    padding-top: 9px;
+    text-align: right;
+}
+.form-row .required { color: var(--fg-danger); }
+.section-divider {
+    border-top: 1px solid var(--border-default);
+    padding-top: 20px;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+.section-divider h3 {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-body);
+}
+.section-divider h3 i { margin-right: 8px; color: var(--fg-brand); }
+
+@media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; gap: 6px; }
+    .form-row label { text-align: left; padding-top: 0; }
+}
+
+/* ==================== Shortcut Cards(index) ==================== */
+
+.shortcut-card {
+    padding: 20px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--neutral-primary-soft);
+    box-shadow: var(--shadow-xs);
+    text-decoration: none;
+    color: var(--text-body);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+}
+.shortcut-card:hover {
+    border-color: var(--border-brand-subtle);
+    background: var(--brand-softer);
+    color: var(--fg-brand);
+    box-shadow: var(--shadow-sm);
+}
+.shortcut-card i { font-size: 22px; }
+.shortcut-card span { font-weight: 500; }
+
+@supports (corner-shape: squircle) {
+    :where(
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dataTables_filter input,
+        .dataTables_wrapper .dataTables_paginate .paginate_button,
+        .btn,
+        .form-input,
+        .action-btn,
+        .tree-item,
+        .roles-container,
+        .role-parent,
+        .upload-dropzone,
+        .upload-progress-item,
+        .shortcut-card
+    ) {
+        corner-shape: var(--corner-shape, squircle);
+    }
+}
+
+/* ============ 後台首頁:營運總覽 bento 格線 ============ */
+/* 12 欄 bento:KPI 小磚 span 3、今日預約大磚 span 8(直向跨 3);
+   側欄由上而下:待辦(緊湊)→ 未來 7 天(伸展)→ 快速動作(固定) */
+.a-bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; align-items: stretch; }
+.a-bento > * { min-width: 0; }
+.a-bento-kpi { grid-column: span 3; }
+.a-bento-main { grid-column: span 8; grid-row: span 3; display: flex; flex-direction: column; overflow: hidden; }
+/* 清單超過磚高時在卡片內捲、表頭釘住 → 整頁不捲動 */
+.a-bento-main .b-tbl-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.a-bento-main .b-tbl thead th { position: sticky; top: 0; z-index: 1; background: var(--neutral-secondary-soft); }
+.a-bento-side { grid-column: span 4; overflow: hidden; }
+@media (max-width: 1200px) {
+    .a-bento-kpi { grid-column: span 6; }
+    .a-bento-main, .a-bento-side { grid-column: span 12; grid-row: auto; }
+}
+
+/* 待辦列可點擊:整列連去預約管理(帶好篩選) */
+a.b-todo { text-decoration: none; transition: background .15s; }
+a.b-todo:hover { background: var(--neutral-secondary-soft); }
+a.b-todo:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+/* 快速動作:四顆一排,窄磚裡改直式(icon 上、字下)才放得下 */
+.a-bento .b-quick { display: grid; grid-template-columns: repeat(4, 1fr); }
+.a-bento .b-quick-btn { flex-direction: column; gap: 8px; padding: 14px 4px; }
+.a-bento .b-quick-btn :where(i, .lucide) { font-size: 16px; }
+
+/* 固定視窗高、整頁不捲動:外殼吃「視窗剩餘高度」,清單在大磚內自捲(同 b_admin.css is-fixed-h 模型)。
+   視窗真的太矮時退回外層捲動(overflow-y:auto),內容不會被裁掉。
+   padding 沿用 b_admin.css 的 .main-content(與球場後台同一條規則)。 */
+.main-content.is-index-fill {
+    height: calc(100vh - var(--header-height));
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.main-content.is-index-fill > .page-header { flex: 0 0 auto; }
+.a-index-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.a-index-body > .a-bento { flex: 1 1 auto; min-height: 0; grid-template-rows: auto auto auto minmax(0, 1fr); }
+/* 快速動作磚吸收側欄剩餘高度:單排按鈕維持原高、在剩餘空間內垂直置中(不拉伸、不擠壓) */
+.a-bento-side.is-quick { display: flex; flex-direction: column; }
+.a-bento-side.is-quick .b-card-head { flex: 0 0 auto; }
+.a-bento-side.is-quick .b-quick { flex: 1 1 auto; min-height: 0; align-content: center; }
+.a-week-row { display: block; text-decoration: none; border-radius: var(--radius-sm); }
+.a-week-row:hover .b-occ-name { color: var(--fg-brand); }
+.a-week-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.a-week-row.is-today .b-occ-name { color: var(--fg-brand); font-weight: 600; }
+@media (max-width: 1200px) {
+    .a-index-body > .a-bento { grid-template-rows: none; flex: 0 0 auto; }
+}
+
+/* ==================== iOS 風搜尋框(頁首動作列,對齊 .b-btn 高度) ==================== */
+/* 造型:膠囊圓角、填色無框、放大鏡在左、自訂清除鈕;聚焦轉白底 + brand 細環。
+   選擇器帶 .main-content 是為了壓過 b_admin.css 的 input[type=search] retrofit(!important)。 */
+.a-search { position: relative; display: inline-flex; align-items: center; height: var(--control-height, 36px); width: 240px; }
+.a-search > i {
+    position: absolute; left: 13px; z-index: 1;
+    color: var(--text-body-subtle); font-size: 13px; pointer-events: none;
+}
+.main-content .a-search input[type="search"] {
+    width: 100%;
+    height: var(--control-height, 36px) !important;
+    min-height: var(--control-height, 36px) !important;
+    padding: 0 32px 0 36px !important;
+    line-height: calc(var(--control-height, 36px) - 2px) !important;
+    border: 1px solid var(--border-default) !important;   /* 淡灰細框(iOS 質感 + 系統 token) */
+    border-radius: var(--control-radius, 10px) !important;   /* 圓角對齊 .b-btn(原膠囊改控制元件同圓角) */
+    background: var(--neutral-tertiary);
+    color: var(--text-heading);
+    font-size: 14px;
+    box-shadow: none;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.main-content .a-search input[type="search"]::placeholder { color: var(--text-body-subtle); }
+.main-content .a-search input[type="search"]:hover { background: var(--neutral-quaternary); }
+.main-content .a-search input[type="search"]:focus {
+    outline: none;
+    background: var(--neutral-primary-soft);
+    border-color: var(--border-brand) !important;
+    box-shadow: 0 0 0 1px var(--brand);
+}
+/* 關掉瀏覽器原生的清除叉叉,用自訂鈕(位置/造型可控) */
+.a-search input[type="search"]::-webkit-search-cancel-button,
+.a-search input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+.a-search-clear {
+    position: absolute; right: 8px; z-index: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: none; padding: 4px; cursor: pointer;
+    color: var(--text-body-subtle); font-size: 14px;
+    transition: color .15s;
+}
+.a-search-clear:hover { color: var(--text-body); }
+.a-search-clear:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-full); }
+
+/* 表頭下分隔線對齊 .b-tbl:DataTables 1.13 用子選擇器(> thead > tr > th)畫 rgba(0,0,0,.3) 深線,
+   特異度高於上方的 table.dataTable thead th → 用同級選擇器壓回 token 淡灰線 */
+table.dataTable > thead > tr > th,
+table.dataTable > thead > tr > td {
+    border-bottom: 1px solid var(--border-default);
+}
+
+/* 防「mount 前閃現」:SPA 化後頁面 app 在 DOMContentLoaded 才 mount,
+   mount 前原始 [[ ]] 綁定與寫死 is-open 的 Vue modal 會先畫出來(程式碼露出/modal 閃現)。
+   → 內容區在 is-page-ready(registry/spa.js mount 完成後加上)之前隱藏,page-header 保留佔位。 */
+.main-content:not(.is-page-ready) > :not(.page-header) { visibility: hidden; }
+
+/* modal 淡入重播的過場暫停 class(base.html 觀察器用;不可用 inline style —— 觀察器監聽 style 會自迴圈) */
+.b-modal-anim-reset { transition: none !important; }
+
+/* Vue <transition name="b-modal-fade">:開關都走 .12s 淡入淡出(對齊 B 的 modal 過場;
+   關閉由 Vue 等 leave 過場結束才隱藏 —— v-show/v-if 皆適用)。
+   帶 .b-modal-overlay 的變體是為了壓過 .b-modal-overlay.is-open { opacity:1 } 的特異度 */
+.b-modal-fade-enter-active, .b-modal-fade-leave-active { transition: opacity .12s ease; }
+.b-modal-fade-enter-from, .b-modal-fade-leave-to,
+.b-modal-overlay.b-modal-fade-enter-from, .b-modal-overlay.b-modal-fade-leave-to { opacity: 0; }
+
+/* ── 分段輸入 wizard modal(.b-modal.is-wizard;course_manage 新增/編輯用,可重用)──
+   長表單拆成多步驟,目標是「單步免捲動」:
+   固定高度框架讓步驟切換時 modal 不跳動;body 保留內滾只當保險(例:窗口列很多)。 */
+.b-modal.is-wizard {
+    display: flex;
+    flex-direction: column;
+    /* 高度自適應視窗:理想 660px,但不可超過「視窗高 − overlay 上下 padding(32px)」,
+       否則矮螢幕會頂出 overlay 造成整個 modal 被捲動。用 max-height 讓它能真正縮小。 */
+    height: min(660px, calc(100vh - 32px));
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+}
+.b-modal.is-wizard form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.b-modal.is-wizard .b-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* 步驟列 = 膠囊 + 連線 stepper:
+   連線 = .b-steps-track 橫軌(撐滿整寬 + .b-steps-fill 的 progressPct 填充有 transition → 切步平滑滑動);
+   膠囊 space-between:首顆貼左、末顆貼右,膠囊實底蓋住兩端線頭 → 不露端點/線條;
+   膠囊本身即節點(不放數字);未到=灰底(同連線色)、active/done=品牌底白字。
+   --steps = 步數(JS 由 :style 傳入)。
+   ⚠️ 不可用 <template v-for>(SPA Vue 編譯會剝 <template>)→ v-for 直接掛 button。 */
+.b-steps {
+    --steps: 5;
+    position: relative; display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; flex-wrap: nowrap;
+}
+/* 連接線軌道:橫貫整寬(左右到容器內緣、穿過膠囊垂直中心);首末膠囊實底蓋住兩端線頭 */
+.b-steps-track {
+    position: absolute; z-index: 0;
+    left: 24px; right: 24px; top: 50%; transform: translateY(-50%);
+    height: 3px; border-radius: var(--radius-full);
+    background: var(--neutral-quaternary, var(--border-default));
+    overflow: hidden;
+}
+.b-steps-fill {
+    height: 100%; width: 0; border-radius: inherit;
+    background: var(--brand);
+    transition: width .38s cubic-bezier(.4, 0, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .b-steps-fill { transition: width .12s linear; }
+}
+
+/* 膠囊 = 節點本體 */
+.b-step {
+    position: relative; z-index: 1;
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center;
+    padding: 7px 16px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--neutral-quaternary, var(--border-default));   /* 未到:灰底(同連線色) */
+    color: var(--text-body-subtle); font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: background .3s ease, color .3s ease;
+}
+.b-step-label { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.b-step:disabled { cursor: default; }
+.b-step:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-medium); }
+.b-step:hover:not(:disabled):not(.is-active):not(.is-done) { color: var(--text-body); }
+/* active / done:品牌底、白字 */
+.b-step.is-active, .b-step.is-done {
+    background: var(--brand);
+    color: var(--b-on-primary, #fff); font-weight: 600;
+}
+
+/* 步驟切換滑動過場(mode="out-in":先舊出、再新入)。
+   前進(fwd):新內容從右滑入、舊內容往左滑出;後退(back):相反。 */
+.b-step-slide-fwd-enter-active, .b-step-slide-fwd-leave-active,
+.b-step-slide-back-enter-active, .b-step-slide-back-leave-active {
+    transition: transform .22s ease, opacity .22s ease;
+}
+.b-step-slide-fwd-enter-from  { transform: translateX(24px); opacity: 0; }
+.b-step-slide-fwd-leave-to    { transform: translateX(-24px); opacity: 0; }
+.b-step-slide-back-enter-from { transform: translateX(-24px); opacity: 0; }
+.b-step-slide-back-leave-to   { transform: translateX(24px); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+    .b-step-slide-fwd-enter-active, .b-step-slide-fwd-leave-active,
+    .b-step-slide-back-enter-active, .b-step-slide-back-leave-active { transition: opacity .15s ease; }
+    .b-step-slide-fwd-enter-from, .b-step-slide-fwd-leave-to,
+    .b-step-slide-back-enter-from, .b-step-slide-back-leave-to { transform: none; }
+}

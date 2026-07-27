@@ -1,0 +1,172 @@
+/* [JustGolf B/C admin] 設計 token 落地層 — typeui「Dashboard Design System」
+   ----------------------------------------------------------------------------
+   把抽象 token(colors / radius / shadows / borders)映射成 CSS 變數。
+   - 每個顏色 token 都定義 light + dark 兩值;dark 走 @media (prefers-color-scheme: dark),
+     元件碼一律用 var(--token),「絕不手動換色」。
+   - brand 預設值放 typeui 系統藍(#1447E6),但後台 chrome 由 b_admin.css 的 :root 把整個 brand
+     token 家族「重新指向各球場主色 --b-primary」(2026-06-24 使用者決定改回球場配色)。前台仍各自 per-course。
+   - Phase 1 先把後台鎖在 light(<html data-color-mode="light">):token 兩值都備齊、dark-ready,
+     但因內頁(Phase 2)尚未全面 token 化,先不讓 OS 深色把半套版面翻黑。Phase 2 拿掉鎖即自動深色。
+   由 cms/b_admin/base.html(球場後台)與 cms/base.html(模擬器後台,2026-07-02 起)載入;前台不受影響。 */
+
+:root {
+  color-scheme: light;
+
+  /* ── 背景:中性 ── */
+  --neutral-primary-soft: #FFFFFF;
+  --neutral-primary: #FFFFFF;
+  --neutral-primary-medium: #FFFFFF;
+  --neutral-secondary-soft: #F9FAFB;
+  --neutral-secondary-medium: #F9FAFB;
+  --neutral-secondary-strong: #F9FAFB;
+  --neutral-tertiary-soft: #F3F4F6;
+  --neutral-tertiary: #F3F4F6;
+  --neutral-tertiary-medium: #F3F4F6;
+  --neutral-quaternary: #E5E7EB;
+  --gray: #D1D5DC;
+
+  /* ── 背景:品牌(系統藍) ── */
+  --brand-softer: #EEF6FF;
+  --brand-soft: #DBEAFE;
+  --brand: #1447E6;
+  --brand-medium: #BEDBFF;
+  --brand-strong: #193CB8;
+
+  /* ── 背景:狀態 ── */
+  --success-soft: #ECFDF5;
+  --success: #007A55;
+  --success-medium: #D0FAE5;
+  --success-strong: #006045;
+  --danger-soft: #FEF0F2;
+  --danger: #C70036;
+  --danger-medium: #FFE4E6;
+  --danger-strong: #A50036;
+  --warning-soft: #FFF7ED;
+  --warning: #F97316;
+  --warning-medium: #FFEDD5;
+  --warning-strong: #C2410C;
+
+  /* ── 背景:工具 ── */
+  --dark: #1F2937;
+  --dark-strong: #111827;
+  --disabled: #F3F4F6;
+
+  /* ── 文字 ── */
+  --text-heading: #111827;
+  --text-body: #4B5563;
+  --text-body-subtle: #6B7280;
+  --fg-brand: #1447E6;
+  --fg-brand-strong: #193CB8;
+  --fg-success: #047857;
+  --fg-success-strong: #065F46;
+  --fg-danger: #BE123C;
+  --fg-danger-strong: #881337;
+  --fg-warning: #7C2D12;
+  --fg-warning-subtle: #EA580C;
+  --fg-disabled: #9CA3AF;
+
+  /* ── 邊框 ── */
+  --border-default: #E5E7EB;
+  --border-default-medium: #E5E7EB;
+  --border-default-strong: #E5E7EB;
+  --border-brand: #1447E6;
+  --border-brand-subtle: #BEDBFF;
+  --border-success: #047857;
+  --border-success-subtle: #A7F3D0;
+  --border-danger: #BE123C;
+  --border-danger-subtle: #FECDD3;
+  --border-warning: #EA580C;
+  --border-warning-subtle: #FED7AA;
+  --border-buffer: #FFFFFF;
+
+  /* ── 圓角(radius.md 為準:4 / 8 / full) ── */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-full: 9999px;
+  --corner-shape: squircle;
+
+  /* ── 陰影 / elevation ── */
+  --shadow-2xs: 0 1px rgb(0 0 0 / 0.05);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* ── 按鈕 glint(inset 高光 + 外緣微光) ── */
+  --color-1-400: rgba(255, 255, 255, 0.25);
+  --color-1-700: rgba(0, 0, 0, 0.12);
+  --btn-glint: inset var(--color-1-400) 0 6px 0 -5px, var(--color-1-700) 0 4px 10px -5px;
+}
+
+/* ── Dark 值:由 <html data-color-mode="dark"> 明確啟用(navbar 深淺色切換鈕,存 localStorage;
+      base.html head inline script 在首繪前套用,無閃色)。不再走 prefers-color-scheme 自動跟隨。 ── */
+:root[data-color-mode="dark"] {
+    color-scheme: dark;
+
+    /* 中性色走純灰黑(2026-07-02 使用者要求;typeui 原 dark 值 #101828/#1E2939 偏藍,已棄用) */
+    --neutral-primary-soft: #1C1C1C;
+    --neutral-primary: #0F0F0F;
+    --neutral-primary-medium: #262626;
+    --neutral-secondary-soft: #141414;
+    --neutral-secondary-medium: #232323;
+    --neutral-secondary-strong: #2E2E2E;
+    --neutral-tertiary-soft: #171717;
+    --neutral-tertiary: #262626;
+    --neutral-tertiary-medium: #303030;
+    --neutral-quaternary: #363636;
+    --gray: #4D4D4D;
+
+    --brand-softer: #162455;
+    --brand-soft: #1C398E;
+    --brand: #155DFC;
+    --brand-medium: #1C398E;
+    --brand-strong: #1447E6;
+
+    --success-soft: #002C22;
+    --success: #009966;
+    --success-medium: #004F3B;
+    --success-strong: #007A55;
+    --danger-soft: #4D0218;
+    --danger: #C70036;
+    --danger-medium: #8B0836;
+    --danger-strong: #A50036;
+    --warning-soft: #7C2D12;
+    --warning: #F97316;
+    --warning-medium: #7C2D12;
+    --warning-strong: #C2410C;
+
+    --dark: #262626;
+    --dark-strong: #3A3A3A;
+    --disabled: #262626;
+
+    --text-heading: #FFFFFF;
+    --text-body: #A6A6A6;
+    --text-body-subtle: #8C8C8C;
+    --fg-brand: #51A2FF;
+    --fg-brand-strong: #BEDBFF;
+    --fg-success: #065F46;
+    --fg-success-strong: #10B981;
+    --fg-danger: #F43F5E;
+    --fg-danger-strong: #F87171;
+    --fg-warning: #FBBF24;
+    --fg-warning-subtle: #F97316;
+    --fg-disabled: #6B7280;
+
+    --border-default: #2B2B2B;
+    --border-default-medium: #3A3A3A;
+    --border-default-strong: #4A4A4A;
+    --border-brand: #51A2FF;
+    --border-brand-subtle: #1C398E;
+    --border-success: #065F46;
+    --border-success-subtle: #064E3B;
+    --border-danger: #BE123C;
+    --border-danger-subtle: #881337;
+    --border-warning: #F97316;
+    --border-warning-subtle: #7C2D12;
+    --border-buffer: #0F0F0F;
+
+    --color-1-400: rgba(255, 255, 255, 0.12);
+    --color-1-700: rgba(0, 0, 0, 0.25);
+}

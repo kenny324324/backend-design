@@ -1,0 +1,658 @@
+{# [JustGolf B] 每球場後台外框：比照 A 的 cms/base.html,選單連結帶 course_code #}
+<!DOCTYPE html>
+{# Phase 1:後台鎖 light(token 兩值都備齊、dark-ready);Phase 2 內頁 token 化後拿掉即自動深色 #}
+<html lang="zh-Hant" data-color-mode="{{ 'dark' if request.args.get('dark') == '1' else 'light' }}"{% if request.args.get('fs') in ('sm', 'lg') %} data-fs="{{ request.args.get('fs') }}"{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}後台{% endblock %} - {{ g.course.name }}</title>
+    <script>
+        /* 深淺色 + 字級偏好:首繪前套用(存 localStorage),避免載入閃色/閃字級 */
+        (function () {
+            try {
+                if (localStorage.getItem('bAdminColorMode') === 'dark') document.documentElement.setAttribute('data-color-mode', 'dark');
+                var fs = localStorage.getItem('bAdminFontSize');
+                if (fs === 'xl') fs = 'lg';   /* 舊三段(標準/大/特大)遺留值相容 */
+                if (fs === 'sm' || fs === 'lg') document.documentElement.setAttribute('data-fs', fs);
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_tokens.css') }}?v=20260702a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_admin.css') }}?v=20260709b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/b/dropdown.css') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        /* typeui Dashboard:8px 圓角預設(4px 小 / full)、elevation 陰影、語意色 — 全部指向 b_tokens.css 的 CSS 變數 */
+        tailwind.config = {
+            theme: {
+                extend: {
+                    borderRadius: {
+                        none: '0', sm: '4px', DEFAULT: '8px', md: '8px',
+                        lg: '8px', xl: '8px', '2xl': '8px', '3xl': '12px', full: '9999px'
+                    },
+                    boxShadow: {
+                        none: 'none',
+                        '2xs': 'var(--shadow-2xs)', xs: 'var(--shadow-xs)', sm: 'var(--shadow-sm)',
+                        DEFAULT: 'var(--shadow-sm)', md: 'var(--shadow-md)', lg: 'var(--shadow-lg)',
+                        xl: 'var(--shadow-xl)', '2xl': 'var(--shadow-2xl)'
+                    },
+                    colors: {
+                        brand: {
+                            DEFAULT: 'var(--brand)', soft: 'var(--brand-soft)', softer: 'var(--brand-softer)',
+                            medium: 'var(--brand-medium)', strong: 'var(--brand-strong)'
+                        },
+                        heading: 'var(--text-heading)',
+                        body: 'var(--text-body)',
+                        'body-subtle': 'var(--text-body-subtle)',
+                        'fg-brand': 'var(--fg-brand)',
+                        surface: 'var(--neutral-primary-soft)',
+                        'surface-soft': 'var(--neutral-secondary-soft)',
+                        'surface-muted': 'var(--neutral-tertiary)',
+                        'border-default': 'var(--border-default)',
+                        success: { DEFAULT: 'var(--success)', soft: 'var(--success-soft)' },
+                        danger: { DEFAULT: 'var(--danger)', soft: 'var(--danger-soft)' },
+                        warning: { DEFAULT: 'var(--warning)', soft: 'var(--warning-soft)' }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        /* 後台 chrome 走「固定一色」:三球場後台統一深墨綠 #173226。
+           不再吃各球場主色 —— 部分球場主色過淺(例:大溪 #fbf2d5),拿來當底配白字會看不見,
+           且後台是內部工具、不需呈現各球場品牌色。前台仍吃 g.theme 主色(本次不動)。
+           --b-primary 仍保留原始主色供標誌/前台沿用;--b-chrome 才是後台 chrome 實際用色,
+           b_admin.css 的 brand token 家族指向 --b-chrome。 */
+        :root {
+            --b-primary: {{ g.theme.get('primary_color') or '#173226' }};
+            --b-chrome: #173226;
+            --b-on-primary: #ffffff;
+            --primary-color: var(--brand);
+            --primary-dark: var(--brand-strong);
+        }
+        /* Vue mount 完成前,隱藏靠 Vue 渲染的區塊(側邊欄選單 [[ ]]、右上登出下拉、flyout),
+           避免重整/首次載入時閃出原始模板碼。inline 放 head → 最早生效,mount 後 Vue 自動移除 v-cloak。 */
+        [v-cloak] { display: none !important; }
+    </style>
+    <!-- b-spa-extra-css-start -->
+    {% block extra_css %}{% endblock %}
+    <!-- b-spa-extra-css-end -->
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="app">
+        <header class="top-header" role="banner">
+            <div class="header-logo">
+                <button class="mobile-menu-btn" @click="toggleSidebar" title="開啟選單">
+                    <i data-lucide="menu" aria-hidden="true"></i>
+                    <span class="sr-only">Open CMS menu</span>
+                </button>
+                {# 無 logo 時整個框不佔位(is-empty);「後台」拆成小標籤與名稱分層 #}
+                <div class="logo-icon{% if not g.theme.get('logo_url') %} is-empty{% endif %}" aria-hidden="true">
+                    {% if g.theme.get('logo_url') %}
+                    <img src="{{ g.theme.get('logo_url') }}" alt="">
+                    {% endif %}
+                </div>
+                <span class="logo-text">{{ g.course.name }}</span>
+                <span class="logo-env">後台</span>
+            </div>
+            <div class="header-right">
+                {# 字級:三段滑桿浮出面板。深淺色:兩顆 icon 都先渲染、用 class 切換顯示 —
+                   ⚠️ 不可用 v-if 換 <i data-lucide>(lucide 會把節點換成 svg,Vue 卸載原節點時爆錯 → 整個 app 掛掉、側欄收合失效) #}
+                {# @click.stop 必要:lucide 重繪會把點到的 svg 換成新節點,冒泡到 document 時
+                   closest() 對脫離的節點回 null → onDocClick 誤判點在外面、面板剛開就關(同 flyout 的坑) #}
+                <div class="header-fs-wrap" v-cloak @click.stop>
+                    <button type="button" class="header-icon-btn" @click="toggleFsPanel" title="字體大小" aria-label="字體大小"
+                            aria-haspopup="true" :aria-expanded="fsOpen ? 'true' : 'false'">
+                        <i data-lucide="a-large-small" aria-hidden="true"></i>
+                    </button>
+                    <transition name="hdr-user">
+                        <div v-if="fsOpen" class="header-fs-panel">
+                            <div class="header-fs-title">字體大小</div>
+                            <input type="range" class="header-fs-range" min="0" max="2" step="1"
+                                   :value="fontLevel" @input="onFsInput" aria-label="字體大小(中/大/特大)">
+                            <div class="header-fs-marks">
+                                <span :class="{ on: fontLevel === 0 }">中</span>
+                                <span :class="{ on: fontLevel === 1 }">大</span>
+                                <span :class="{ on: fontLevel === 2 }">特大</span>
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+                <button type="button" class="header-icon-btn header-mode-btn" v-cloak
+                        :class="{ 'is-dark': colorMode === 'dark' }" @click="toggleColorMode"
+                        :title="colorMode === 'dark' ? '切換淺色模式' : '切換深色模式'"
+                        :aria-label="colorMode === 'dark' ? '切換淺色模式' : '切換深色模式'">
+                    <span class="mode-ic mode-ic-moon"><i data-lucide="moon" aria-hidden="true"></i></span>
+                    <span class="mode-ic mode-ic-sun"><i data-lucide="sun" aria-hidden="true"></i></span>
+                </button>
+                <span class="header-sep" aria-hidden="true"></span>
+                <a href="{{ preview_links.get('manual') if preview_links is defined else url_for('cms_b_admin.manual') }}" class="header-icon-btn" title="操作手冊" aria-label="操作手冊">
+                    <i data-lucide="circle-question-mark" aria-hidden="true"></i>
+                </a>
+                <a href="{{ preview_links.get('front_home') if preview_links is defined else url_for('b_booking.index') }}"
+                   target="_blank" rel="noopener" class="header-icon-btn" title="前往前台" aria-label="前往前台">
+                    <i data-lucide="external-link" aria-hidden="true"></i>
+                </a>
+                <div class="header-user-wrap" v-cloak>
+                    <button type="button" class="header-user-btn" @click="toggleHeaderUser"
+                            :aria-expanded="headerUserOpen ? 'true' : 'false'" aria-haspopup="menu">
+                        <span class="header-user-avatar" aria-hidden="true"><i data-lucide="user-round"></i></span>
+                        <span class="header-user-name">{{ session.get('b_admin', {}).get('name', '管理者') }}</span>
+                        <i data-lucide="chevron-down" class="header-user-caret" :class="{ open: headerUserOpen }" aria-hidden="true"></i>
+                    </button>
+                    <transition name="hdr-user">
+                        <div v-if="headerUserOpen" class="header-user-menu" role="menu">
+                            <div class="header-user-head">
+                                <div class="header-user-head-name">{{ session.get('b_admin', {}).get('name', '管理者') }}</div>
+                                <div class="header-user-head-email">{{ session.get('b_admin', {}).get('email', '') }}</div>
+                            </div>
+                            <div class="header-user-sep"></div>
+                            <form method="post" :action="`${BASE_URL}/cms/{{ g.course_code }}/logout`" class="header-user-logout-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="header-user-item is-logout" role="menuitem">
+                                    <i data-lucide="log-out" aria-hidden="true"></i><span>登出</span>
+                                </button>
+                            </form>
+                        </div>
+                    </transition>
+                </div>
+            </div>
+        </header>
+
+        <nav id="cms-sidebar" v-cloak class="sidebar" :class="{ open: sidebarOpen, collapsed: sidebarCollapsed }" aria-label="CMS menu">
+            <div class="sidebar-nav">
+                {# 儀表板獨立置頂;filteredMenu 已把 url=dashboard 從子選單過濾,不會重複 #}
+                <a :href="menuHref('dashboard')" :class="['menu-item', isCurrentMenuItem({ url: 'dashboard' }) ? 'active' : '']">
+                    <i data-lucide="gauge" aria-hidden="true"></i>
+                    <span class="menu-text">儀表板</span>
+                </a>
+                <template v-for="(menu, idx) in filteredMenu" :key="menu.id">
+                    <template v-if="menu.sub && menu.sub.length > 0">
+                        <button @click="onGroupClick(idx, menu, $event)" type="button"
+                                :class="['menu-item', 'submenu-toggle', isMenuOpen(idx) ? 'open' : '', isGroupActive(menu, idx) ? 'active' : '']">
+                            <span class="menu-left">
+                                <i :data-lucide="getMenuIcon(menu)" aria-hidden="true"></i>
+                                <span class="menu-text">[[ menu.title ]]</span>
+                            </span>
+                            <i data-lucide="chevron-down" class="menu-caret" aria-hidden="true"></i>
+                        </button>
+                        <div :class="['submenu', isMenuOpen(idx) ? 'show' : '']">
+                            <div class="submenu-inner">
+                                <a v-for="sub in menu.sub" :key="sub.id"
+                                   :href="menuHref(sub.url)"
+                                   :class="['menu-item', 'submenu-item', isCurrentMenuItem(sub) ? 'active' : '']">
+                                    <span class="menu-text">[[ sub.title ]]</span>
+                                </a>
+                            </div>
+                        </div>
+                    </template>
+                    <a v-else :href="menuHref(menu.url)"
+                       :class="['menu-item', isCurrentMenuItem(menu) ? 'active' : '']">
+                        <i :data-lucide="getMenuIcon(menu)" aria-hidden="true"></i>
+                        <span class="menu-text">[[ menu.title ]]</span>
+                    </a>
+                </template>
+                {# 登出已移到右上角帳號下拉(navbar),側邊欄不再重複放登出 #}
+            </div>
+
+            <div class="sidebar-toggle">
+                <button class="toggle-btn" @click="toggleCollapse" :title="sidebarCollapsed ? '展開側邊欄' : '收合側邊欄'">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <rect class="panel-left-fill" x="3" y="3" width="6" height="18" rx="2" fill="currentColor" stroke="none"/>
+                        <path d="M9 3v18"/>
+                    </svg>
+                    <span class="sr-only">[[ sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' ]]</span>
+                </button>
+            </div>
+        </nav>
+
+        <div class="sidebar-overlay" :class="{ show: sidebarOpen }" @click="closeSidebar" aria-hidden="true"></div>
+
+        <!-- 收合時:點群組圖示跳出子項浮窗(對齊 JustAI);transition 做展開動畫 -->
+        <transition name="flyout">
+            <div v-if="flyout.open" v-cloak class="cms-flyout" :style="{ top: flyout.top + 'px', left: flyout.left + 'px' }">
+                <div class="cms-flyout-title">[[ flyout.title ]]</div>
+                <a v-for="sub in flyout.items" :key="sub.id"
+                   :href="menuHref(sub.url)"
+                   :class="['cms-flyout-item', isCurrentMenuItem(sub) ? 'active' : '']">
+                    <span>[[ sub.title ]]</span>
+                </a>
+            </div>
+        </transition>
+
+        {# 顯示並消耗後台自己的 flash(避免訊息洩漏到前台);右下角 toast,從右側滑入→停留→滑出。
+           白底淺灰邊框,狀態只用不同顏色 icon 區分(成功綠、失敗紅、警告橘)。樣式在 b_admin.css(.b-toast*)。 #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="bm-flash" class="b-toast-wrap" role="status" aria-live="polite">
+            {% for category, message in messages %}
+            <div class="b-toast b-toast-{{ 'success' if category == 'success' else ('warning' if category == 'warning' else 'danger') }}">
+                <span class="b-toast-icon" aria-hidden="true">
+                    <i data-lucide="{{ 'circle-check' if category == 'success' else ('triangle-alert' if category == 'warning' else 'circle-x') }}"></i>
+                </span>
+                <span class="b-toast-msg">{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <script>
+            /* toast 動畫由 CSS @keyframes b-toast-life 自動播放(滑入→停留→滑出),JS 只做:
+               多則時錯開起點(animation-delay)、確保 icon 渲染(renderLucideIcons 在 body 末尾才定義→等 load)、結束移除節點。 */
+            (function () {
+                var wrap = document.getElementById('bm-flash');
+                if (!wrap) return;
+                var toasts = wrap.querySelectorAll('.b-toast');
+                Array.prototype.forEach.call(toasts, function (t, i) {
+                    t.style.animationDelay = (i * 0.12) + 's';            // 多則錯開
+                    t.addEventListener('animationend', function () {
+                        t.remove();
+                        if (!wrap.children.length) wrap.remove();
+                    });
+                });
+                function paintIcons() { if (window.renderLucideIcons) window.renderLucideIcons(); }
+                if (window.renderLucideIcons) paintIcons();
+                else window.addEventListener('load', paintIcons);          // renderLucideIcons 在 body 末尾定義
+            })();
+        </script>
+        {% endif %}
+        {% endwith %}
+
+        <main id="main-content" class="main-content {% block main_modifier %}{% endblock %}" tabindex="-1">
+            <div class="page-header">
+                <h1 class="page-title">{% block page_title %}後台管理{% endblock %}</h1>
+                {# 右上動作槽:內頁可放「+ 新增 / 篩選」等觸發鈕(與標題同列、靠右對齊) #}
+                <div class="page-actions">{% block page_actions %}{% endblock %}</div>
+            </div>
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {% if preview_user_menu is defined %}
+    <script>
+        window.__B_PREVIEW_MENU = {{ preview_user_menu|tojson }};
+        window.__B_PREVIEW_LINKS = {{ preview_links|default({})|tojson }};
+        window.__B_PREVIEW_CURRENT_PAGE = {{ preview_current_page|default('dashboard')|tojson }};
+    </script>
+    {% endif %}
+    <script>
+        window.BASE_URL = '{{ APPLICATION_ROOT if APPLICATION_ROOT != "/" else "" }}';
+        const BASE_URL = window.BASE_URL;
+        window.COURSE_CODE = '{{ g.course_code }}';   // spa.js 的 shouldHandle 讀 window.COURSE_CODE 判斷後台連結前綴 → 必須掛 window
+        const COURSE_CODE = window.COURSE_CODE;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        if (window.axios) {
+            axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
+            axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+        }
+        window.renderLucideIcons = function () {
+            if (!window.lucide || !window.lucide.createIcons) return;
+            window.lucide.createIcons({
+                attrs: {
+                    'stroke-width': 2.2,
+                    'aria-hidden': 'true'
+                }
+            });
+        };
+
+        const __bVueApp = Vue.createApp({
+            delimiters: ['[[', ']]'],
+            data() {
+                return {
+                    BASE_URL,
+                    sidebarOpen: false,
+                    sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+                    openMenus: {},
+                    headerUserOpen: false,
+                    colorMode: document.documentElement.getAttribute('data-color-mode') === 'dark' ? 'dark' : 'light',
+                    fontLevel: ({ sm: 0, lg: 2 })[document.documentElement.getAttribute('data-fs')] ?? 1,   // 0中/1大(預設)/2特大
+                    fsOpen: false,
+                    userMenu: window.__B_PREVIEW_MENU || [],
+                    flyout: { open: false, idx: null, title: '', items: [], top: 0, left: 0 },
+                    currentPage: window.__B_PREVIEW_CURRENT_PAGE || '{{ request.endpoint.split(".")[-1] if request.endpoint else "" }}',
+                    currentPath: '{{ request.path }}'
+                };
+            },
+            computed: {
+                filteredMenu() {
+                    return (this.userMenu || [])
+                        .filter(menu => menu && menu.title !== '登出' && menu.url !== 'dashboard')
+                        .map(menu => {
+                            if (!menu.sub) return menu;
+                            const sub = menu.sub.filter(s => s.url !== 'dashboard');
+                            return Object.assign({}, menu, { sub });
+                        })
+                        .filter(menu => !menu.sub || menu.sub.length > 0);
+                }
+            },
+            created() {
+                if (window.__B_PREVIEW_MENU) this.markActiveMenus();
+                else this.loadUserMenu();
+                document.addEventListener('click', this.onDocClick);
+            },
+            mounted() {
+                this.refreshIcons();
+            },
+            updated() {
+                this.refreshIcons();
+            },
+            methods: {
+                // 柔和過場(深淺色 + 字級共用):暫掛 .b-mode-anim 開全域 transition(500ms 後移除,避免常駐拖慢其他互動)。
+                // 尊重「減少動態效果」偏好。
+                softApply(fn) {
+                    const root = document.documentElement;
+                    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        fn();
+                    } else {
+                        root.classList.add('b-mode-anim');
+                        clearTimeout(this._modeAnimT);
+                        const apply = () => {
+                            fn();
+                            this._modeAnimT = setTimeout(() => root.classList.remove('b-mode-anim'), 500);
+                        };
+                        if (window.requestAnimationFrame) {
+                            requestAnimationFrame(() => requestAnimationFrame(apply));
+                        } else {
+                            setTimeout(apply, 16);
+                        }
+                    }
+                },
+                toggleColorMode() {
+                    this.softApply(() => {
+                        this.colorMode = this.colorMode === 'dark' ? 'light' : 'dark';
+                        document.documentElement.setAttribute('data-color-mode', this.colorMode);
+                        try { localStorage.setItem('bAdminColorMode', this.colorMode); } catch (e) { }
+                    });
+                },
+                toggleFsPanel() {
+                    this.fsOpen = !this.fsOpen;
+                    if (this.fsOpen) { this.headerUserOpen = false; this.closeFlyout(); }
+                },
+                onFsInput(e) {
+                    const level = Number(e.target.value) || 0;
+                    if (level === this.fontLevel) return;
+                    this.softApply(() => {
+                        this.fontLevel = level;
+                        const key = ['sm', 'std', 'lg'][level] || 'std';
+                        if (key === 'std') {
+                            document.documentElement.removeAttribute('data-fs');
+                            try { localStorage.removeItem('bAdminFontSize'); } catch (e2) { }
+                        } else {
+                            document.documentElement.setAttribute('data-fs', key);
+                            try { localStorage.setItem('bAdminFontSize', key); } catch (e2) { }
+                        }
+                    });
+                },
+                refreshIcons() {
+                    this.$nextTick(() => window.renderLucideIcons && window.renderLucideIcons());
+                },
+                menuHref(url) {
+                    if (window.__B_PREVIEW_LINKS && window.__B_PREVIEW_LINKS[url]) return window.__B_PREVIEW_LINKS[url];
+                    return `${BASE_URL}/cms/{{ g.course_code }}/` + url;
+                },
+                menuKey(idx) {
+                    return 'menu_' + idx;
+                },
+                isMenuOpen(idx) {
+                    return this.openMenus[this.menuKey(idx)] === true;
+                },
+                pageKey(value) {
+                    return String(value || '')
+                        .split('?')[0]
+                        .split('#')[0]
+                        .replace(/\/+$/, '')
+                        .split('/')
+                        .pop()
+                        .split('.')
+                        .pop()
+                        .replace(/_page$/, '')
+                        .toLowerCase();
+                },
+                isCurrentMenuItem(item) {
+                    const current = this.pageKey(this.currentPage);
+                    const currentPath = String(this.currentPath || '').split('?')[0].replace(/\/+$/, '').toLowerCase();
+                    const candidates = [item && item.url, item && item.code]
+                        .map(v => this.pageKey(v))
+                        .filter(Boolean);
+                    if (candidates.includes(current)) return true;
+                    return candidates.some(key => currentPath.endsWith('/' + key));
+                },
+                menuOwnsCurrent(menu) {
+                    return !!(menu && menu.sub && menu.sub.some(sub => this.isCurrentMenuItem(sub)));
+                },
+                isGroupActive(menu, idx) {
+                    return this.menuOwnsCurrent(menu) && (this.sidebarCollapsed || !this.isMenuOpen(idx));
+                },
+                markActiveMenus() {
+                    const next = Object.assign({}, this.openMenus);
+                    this.filteredMenu.forEach((menu, idx) => {
+                        if (menu.sub && menu.sub.some(sub => this.isCurrentMenuItem(sub))) {
+                            next[this.menuKey(idx)] = true;
+                        }
+                    });
+                    this.openMenus = next;
+                },
+                toggleMenu(menu) {
+                    const willOpen = !this.openMenus[menu];
+                    // 單一展開:打開一個就收合其他(對齊 JustAI accordion)
+                    const next = {};
+                    Object.keys(this.openMenus).forEach(k => { next[k] = false; });
+                    next[menu] = willOpen;
+                    this.openMenus = next;
+                },
+                // 群組點擊:展開態 → 手風琴;收合態 → 跳出子項浮窗(對齊 JustAI)
+                isMobileSidebar() {
+                    return window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
+                },
+                onGroupClick(idx, menu, ev) {
+                    if (this.sidebarCollapsed && !this.isMobileSidebar()) {
+                        // 阻止這次 click 冒泡到 document 的 onDocClick,否則 flyout 剛開就被同一輪事件關掉
+                        // (Lucide 把 icon 換成 <svg> 後,onDocClick 的 closest('.submenu-toggle') 可能抓不到 → 誤關)。
+                        ev.stopPropagation();
+                        this.toggleFlyout(idx, menu, ev.currentTarget);
+                    } else {
+                        this.toggleMenu(this.menuKey(idx));
+                    }
+                },
+                // 收合軌浮窗:點同一個 → 關;點開著時點別的 → 先收當前、再展開新的(有過渡);關著 → 直接開
+                toggleFlyout(idx, menu, btn) {
+                    if (this.flyout.open && this.flyout.idx === idx) {
+                        this.closeFlyout();                       // 同一個再點 → 關
+                    } else if (this.flyout.open) {
+                        this.closeFlyout();                       // 已開別的 → 先收
+                        setTimeout(() => this.openFlyout(idx, menu, btn), 130);  // 等離場動畫(.12s)跑完再開新的
+                    } else {
+                        this.openFlyout(idx, menu, btn);          // 關著 → 直接開
+                    }
+                },
+                openFlyout(idx, menu, btn) {
+                    const r = btn.getBoundingClientRect();
+                    this.flyout = { open: true, idx: idx, title: menu.title, items: menu.sub || [], top: r.top, left: r.right + 8 };
+                },
+                closeFlyout() { this.flyout.open = false; },
+                toggleHeaderUser() {
+                    this.headerUserOpen = !this.headerUserOpen;
+                    if (this.headerUserOpen) { this.closeFlyout(); this.fsOpen = false; }
+                },
+                onDocClick(e) {
+                    if (this.flyout.open && !e.target.closest('.cms-flyout') && !e.target.closest('.submenu-toggle')) {
+                        this.closeFlyout();
+                    }
+                    if (this.headerUserOpen && !e.target.closest('.header-user-wrap')) {
+                        this.headerUserOpen = false;
+                    }
+                    if (this.fsOpen && !e.target.closest('.header-fs-wrap')) {
+                        this.fsOpen = false;
+                    }
+                },
+                toggleSidebar() { this.sidebarOpen = !this.sidebarOpen; },
+                closeSidebar() { this.sidebarOpen = false; },
+                toggleCollapse() {
+                    this.sidebarCollapsed = !this.sidebarCollapsed;
+                    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+                    this.closeFlyout();
+                },
+                getMenuIcon(menu) {
+                    const key = `${menu && menu.url || ''} ${menu && menu.title || ''}`.toLowerCase();
+                    // 規則順序很重要(先比中→第一個命中);把易混淆的(指派 vs 桿弟)放前面
+                    const rules = [
+                        ['dashboard', 'gauge'], ['儀表', 'gauge'], ['首頁', 'gauge'],
+                        ['assignment', 'user-check'], ['指派', 'user-check'],
+                        ['caddie', 'users'], ['桿弟', 'users'],
+                        ['review', 'star'], ['評鑑', 'star'], ['評價', 'star'],
+                        ['checkin', 'qr-code'], ['報到', 'qr-code'],
+                        ['booking', 'calendar-check'], ['預約', 'calendar-check'],
+                        ['slot', 'clock'], ['時段', 'clock'],
+                        ['billing', 'receipt'], ['帳務', 'receipt'], ['帳', 'receipt'],
+                        ['theme', 'palette'], ['主題', 'palette'],
+                        ['設定', 'settings'], ['營運', 'layers'],
+                        ['i18n', 'languages'], ['多語', 'languages'], ['語系', 'languages'],
+                        ['user', 'user-round'], ['使用者', 'user-round'], ['帳號', 'user-round'],
+                        ['role', 'shield'], ['權限', 'shield'], ['群組', 'shield'],
+                        ['menu', 'menu'], ['選單', 'menu'],
+                        ['content', 'file-text'], ['內容', 'file-text'],
+                        ['orgtree', 'network'], ['組織', 'network'], ['store', 'building-2'], ['店', 'building-2'],
+                        ['profile', 'id-card'], ['個人', 'id-card'],
+                    ];
+                    const m = rules.find(([k]) => key.includes(k));
+                    return m ? m[1] : (menu && menu.sub && menu.sub.length ? 'layers' : 'circle-dot');
+                },
+                async loadUserMenu() {
+                    try {
+                        const res = await axios.get(`${BASE_URL}/cms/${COURSE_CODE}/usermenu`);
+                        if (res.data.success) {
+                            this.userMenu = res.data.menu || [];
+                            this.markActiveMenus();
+                        }
+                    } catch (e) { console.error('載入後台選單失敗：', e); }
+                }
+            }
+        });
+        // 暴露 app 根實例給 SPA 殼層:spa.js 換頁時更新 currentPage/currentPath → 側邊欄 active 自動重算(Vue 響應式,不重建 DOM)
+        window.__bApp = __bVueApp.mount('#app');
+    </script>
+    <script src="{{ url_for('static', filename='js/b/dropdown.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/b/context-menu.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/b/filter.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/b/spa.js') }}?v=head-sync-20260702"></script>
+    {# 共用對話框 + toast:BDialog.confirm/alert/prompt、BToast.success/danger/warning(取代原生 alert/confirm/prompt) #}
+    <script src="{{ url_for('static', filename='js/cms/dialogs.js') }}?v=20260709a"></script>
+    {# 現場收款 prompt:document submit 全域委派,殼層只載一次(SPA 下不可放各頁 extra_js,否則重複綁定→雙重 prompt) #}
+    <script src="{{ url_for('static', filename='js/pages/b/admin-billing.js') }}?v=20260709a"></script>
+    {# SPA:各頁專屬 JS 全部在殼層載一次,各自只「註冊」window.pageInit.<name>(不立即執行);
+       spa.js 換頁時呼叫對應 init。這樣即使第一次直接進別頁,所有 pageInit 都已就緒,SPA 切到任一頁互動都正常。 #}
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="{{ url_for('static', filename='js/pages/b/admin-bookings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/b/admin-slots.js') }}?v=20260709a"></script>
+    <script src="{{ url_for('static', filename='js/pages/b/admin-theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/b/checkin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/b/manual.js') }}"></script>
+    <script>
+        /* 右上動作面板(.b-pop):觸發鈕 [data-pop] 開合同層 .b-pop-panel;點外面 / Esc 收起。
+           純呈現互動,獨立於 Vue app;與共用 BDropdown 並存(面板內的 select 仍由 BDropdown 接管)。 */
+        (function () {
+            function closeAll(except) {
+                document.querySelectorAll('.b-pop.is-open').forEach(function (p) {
+                    if (p !== except) { p.classList.remove('is-open'); var t = p.querySelector('[data-pop]'); if (t) t.setAttribute('aria-expanded', 'false'); }
+                });
+            }
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('[data-pop]');
+                if (trigger) {
+                    e.preventDefault();
+                    var pop = trigger.closest('.b-pop');
+                    if (!pop) return;
+                    var willOpen = !pop.classList.contains('is-open');
+                    closeAll(pop);
+                    pop.classList.toggle('is-open', willOpen);
+                    trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                    if (willOpen) { var f = pop.querySelector('.b-pop-panel input, .b-pop-panel select'); if (f) setTimeout(function () { f.focus(); }, 0); }
+                    return;
+                }
+                // 點面板內部不關;點面板外才關
+                if (!e.target.closest('.b-pop-panel')) closeAll(null);
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(null); });
+        })();
+
+        /* Modal(.b-modal-overlay):[data-modal-open="id"] 開、[data-modal-close]/點遮罩/Esc 關。
+           共用、純呈現;開啟時鎖 body 捲動、聚焦首個輸入。 */
+        (function () {
+            // 兩段式淡入淡出:is-visible 先上 display,下一幀加 is-open 觸發 opacity 過渡;關閉反向 + 等過渡結束移除 display。
+            function openModal(ov) {
+                if (!ov) return;
+                ov.classList.add('is-visible');
+                document.body.classList.add('b-modal-lock');
+                // 強制 reflow 後加 is-open,確保 opacity 過渡會播
+                void ov.offsetWidth;
+                ov.classList.add('is-open');
+                var f = ov.querySelector('input:not([type=hidden]), select, textarea, button');
+                if (f) setTimeout(function () { f.focus(); }, 0);
+            }
+            function closeModal(ov) {
+                if (!ov || !ov.classList.contains('is-open')) return;
+                ov.classList.remove('is-open');                       // 觸發淡出
+                var done = function () {
+                    ov.classList.remove('is-visible');                // 淡出完才移除 display
+                    ov.removeEventListener('transitionend', done);
+                    if (!document.querySelector('.b-modal-overlay.is-open')) document.body.classList.remove('b-modal-lock');
+                };
+                ov.addEventListener('transitionend', done);
+                // 後備:萬一沒觸發 transitionend(被 reduced-motion 等略過),逾時強制收尾
+                setTimeout(function () { if (ov.classList.contains('is-visible') && !ov.classList.contains('is-open')) done(); }, 180);
+            }
+            document.addEventListener('click', function (e) {
+                var opener = e.target.closest('[data-modal-open]');
+                if (opener) { e.preventDefault(); openModal(document.getElementById(opener.getAttribute('data-modal-open'))); return; }
+                if (e.target.closest('[data-modal-close]')) { e.preventDefault(); closeModal(e.target.closest('.b-modal-overlay')); return; }
+                // 點遮罩本身(非 modal 內容)關閉
+                if (e.target.classList.contains('b-modal-overlay')) closeModal(e.target);
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { var ov = document.querySelector('.b-modal-overlay.is-open'); if (ov) closeModal(ov); }
+            });
+        })();
+
+        /* 必填守門(可重用):送出鈕加 [data-require-fill] → 監看同 form 內所有 [required] 欄位,
+           全部有值才解除 disabled。任何含此鈕的表單自動生效;modal 開啟時也重算一次。 */
+        (function () {
+            function fieldFilled(el) {
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                    if (el.name) return !!el.form.querySelector('[name="' + el.name + '"]:checked');
+                    return el.checked;
+                }
+                return (el.value || '').trim() !== '';
+            }
+            function refresh(form) {
+                var btn = form.querySelector('[data-require-fill]');
+                if (!btn) return;
+                var required = form.querySelectorAll('[required]');
+                var allFilled = Array.prototype.every.call(required, fieldFilled);
+                btn.disabled = !allFilled;
+            }
+            function refreshAll(root) {
+                (root || document).querySelectorAll('form [data-require-fill]').forEach(function (btn) { if (btn.form) refresh(btn.form); });
+            }
+            // 任意輸入變動 → 重算所在 form
+            document.addEventListener('input', function (e) { if (e.target.form) refresh(e.target.form); });
+            document.addEventListener('change', function (e) { if (e.target.form) refresh(e.target.form); });
+            // modal 開啟時重算(初始 disabled 正確)
+            document.addEventListener('click', function (e) {
+                var opener = e.target.closest('[data-modal-open]');
+                if (opener) setTimeout(function () { refreshAll(document.getElementById(opener.getAttribute('data-modal-open'))); }, 0);
+            });
+            // 首次載入先鎖好
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { refreshAll(); });
+            else refreshAll();
+            window.BRequireFill = { refresh: refresh, refreshAll: refreshAll };
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

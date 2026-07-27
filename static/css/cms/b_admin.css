@@ -1,0 +1,1764 @@
+/* [JustGolf B/C admin] 設計語言層 — typeui「Dashboard Design System」
+   ----------------------------------------------------------------------------
+   ⚠️ 已從舊「2px 全平面 / 無陰影」改為 typeui:8px 圓角、elevation 陰影。
+      後台 chrome brand = 各球場主色 --b-primary(2026-06-24 推翻系統藍;見 :root block 下方)。
+   token 全部來自 b_tokens.css(先載入),這裡的元件碼「不寫死 hex」。
+   只由 cms/b_admin/base.html 載入;A 後台(cms/base.css)與各球場前台不受影響。
+   元件做成「版型無關」:不寫死外距 / 定位,排版交給內頁(Phase 2)。 */
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Ultralight.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Thin.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PingFang TC Admin";
+  src: url("../../assets/fonts/pingfang-tc/PingFangTC-Semibold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --sidebar-width: 256px;
+  --font-admin: "PingFang TC Admin", "PingFang TC", "Microsoft JhengHei", sans-serif;
+
+  /* ★ 後台 chrome 主色 = 固定深墨綠 --b-chrome(由 base.html 注入 #173226,三球場統一)。
+     把 typeui brand token 家族全部改由 --b-chrome 衍生 → 按鈕/選取/focus/badge/下拉/分頁… 統一一色。
+     (2026-06-26 使用者決定:後台改「固定一色 #173226 深墨綠」;先前「吃各球場主色」因部分球場主色過淺
+      (如大溪 #fbf2d5)配白字看不見而推翻。前台仍吃球場主色,本次不動。) */
+  --brand: var(--b-chrome);
+  --brand-strong: color-mix(in srgb, var(--b-chrome) 84%, #000);
+  --brand-medium: color-mix(in srgb, var(--b-chrome) 36%, #fff);
+  --brand-soft: color-mix(in srgb, var(--b-chrome) 18%, #fff);
+  --brand-softer: color-mix(in srgb, var(--b-chrome) 10%, #fff);
+  --fg-brand: var(--b-chrome);
+  --fg-brand-strong: color-mix(in srgb, var(--b-chrome) 88%, #000);
+  --border-brand: var(--b-chrome);
+  --border-brand-subtle: color-mix(in srgb, var(--b-chrome) 32%, #fff);
+
+  /* 共用下拉(b/dropdown.css)在「後台情境」的 token 覆寫:
+     前台不載入本檔 → 仍吃 dropdown.css 內的 fallback(維持前台舊樣不變)。 */
+  --dd-surface: var(--neutral-primary-soft);
+  --dd-text: var(--text-heading);
+  --dd-placeholder: var(--text-body);
+  --dd-caret: var(--text-body);
+  --dd-border: var(--border-default-medium);
+  --dd-border-hover: var(--border-default-strong);
+  --dd-radius: var(--radius-md);
+  --dd-accent: var(--brand);
+  --dd-trigger-shadow: var(--shadow-xs);
+  --dd-menu-shadow: var(--shadow-lg);
+  --dd-item-hover: var(--neutral-tertiary-medium);
+  --dd-item-hover-text: var(--text-heading);
+  --dd-item-active-bg: var(--brand-softer);
+  --dd-item-active-text: var(--fg-brand-strong);
+  --dd-disabled: var(--fg-disabled);
+
+  /* ★ 表單欄位統一參數(全站下拉/輸入/選擇器共用,改一處全站一致)。
+     高度/左右內距/圓角 一組變數,杜絕「某欄 41、某欄 36」對不齊。 */
+  --field-height: 36px;
+  --field-pad-x: 12px;
+  --field-radius: 10px;
+  --field-font-size: 14px;
+  --control-height: var(--field-height);
+  --control-pad-x: 14px;
+  --control-radius: var(--field-radius);
+  /* 下拉選單(b/dropdown.css)也吃同一組:trigger 高度/圓角 = 欄位參數 */
+  --dd-radius: var(--field-radius);
+}
+
+@supports (corner-shape: squircle) {
+  :where(
+    .skip-link,
+    .header-user-menu,
+    .header-user-menu .header-user-item,
+    .sidebar .menu-item,
+    .sidebar .submenu-toggle,
+    .toggle-btn,
+    .b-tbl-scroll,
+    .b-pop-panel,
+    .cms-flyout,
+    .cms-flyout-item,
+    .content-card,
+    .b-card,
+    .b-kpi,
+    .b-kpi-icon,
+    .b-btn,
+    .b-input,
+    .b-select,
+    .b-textarea,
+    .b-tbl-wrap,
+    .b-badge.square,
+    .b-seg,
+    .b-seg a,
+    .b-seg button,
+    .b-tab,
+    .b-empty-icon,
+    .b-alert,
+    .b-ish-square,
+    .b-avatar-square,
+    .b-modal,
+    .b-modal-close,
+    .b-quick-btn,
+    .main-content input,
+    .main-content textarea,
+    .main-content select,
+    .main-content .rounded,
+    .main-content .rounded-sm,
+    .main-content .rounded-md,
+    .main-content .rounded-lg,
+    .main-content .rounded-xl,
+    .main-content .rounded-2xl,
+    .main-content .rounded-3xl
+  ):not(.rounded-full) {
+    corner-shape: var(--corner-shape, squircle);
+  }
+
+  .b-pagination > :first-child,
+  .b-pagination > :last-child {
+    corner-shape: var(--corner-shape, squircle);
+  }
+}
+
+/* ── 字體 + 基礎排版 ── */
+body {
+  font-family: var(--font-admin);
+  font-weight: 400;
+  background: var(--neutral-secondary-soft);
+  color: var(--text-body);
+}
+.main-content { font-size: 14px; color: var(--text-body); }
+.num, .b-kpi-value,
+.b-tbl td.num, .b-tbl th.num { font-variant-numeric: tabular-nums; }
+.lucide {
+  width: 1em;
+  height: 1em;
+  stroke-width: 2.2;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   外殼:頂部導航 + 側邊欄(套 sidebars.md)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* 頂部導航列:白底、底部 1px 分隔、無陰影 */
+.top-header {
+  background: var(--neutral-primary-soft);
+  border-bottom: 1px solid var(--border-default);
+  box-shadow: none;
+}
+/* ── header logo 區(蓋掉 base.css 為 A 後台橫幅 logo 設的 132px 固定框)──
+      寬度隨圖:間距回歸真實 gap,不再因 logo 形狀在框內置中而忽遠忽近;
+      高度收到 34px,讓文字當主角;無 logo(.is-empty)整個不佔位。 */
+.header-logo { width: auto; }
+.header-logo .logo-icon { width: auto; min-width: 0; max-width: 140px; height: 34px; }
+.header-logo .logo-icon.is-empty { display: none; }
+.header-logo .logo-text { color: var(--text-heading); font-weight: 600; font-size: 1rem; white-space: nowrap; }
+/* 「後台」環境標籤:小字灰 pill,與球場名分層 */
+.header-logo .logo-env {
+  flex: none; padding: 2px 9px; font-size: 12px; font-weight: 500; line-height: 1.5;
+  color: var(--text-body-subtle); background: var(--neutral-secondary-medium);
+  border: 1px solid var(--border-default); border-radius: var(--radius-full); white-space: nowrap;
+}
+/* 深色:彩色 logo 給白底小襯墊,不糊在深底上 */
+[data-color-mode="dark"] .header-logo .logo-icon:not(.is-empty) {
+  background: #fff; border-radius: var(--radius-sm); padding: 3px 6px; box-sizing: border-box;
+}
+.header-right { gap: 12px; }
+.header-right a, .header-right button { color: var(--text-body); }
+.header-right a:hover, .header-right button:hover { color: var(--fg-brand); }
+
+/* ── 前往前台:icon-only ghost 鈕(對齊截圖頂列圖示) ── */
+.header-right .header-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--radius-full);
+  color: var(--text-body); font-size: 16px; text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.header-right .header-icon-btn:hover { background: var(--neutral-secondary-medium); color: var(--fg-brand); }
+
+/* ── 帳號下拉:頭像 + 名 + caret → 點開顯示 名/email + 登出 ── */
+.header-user-wrap { position: relative; }
+.header-right .header-user-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  /* 永遠是膠囊(等同原 hover 樣);hover 再加深一階做回饋 */
+  padding: 4px 10px 4px 4px; border: 1px solid var(--border-default); border-radius: var(--radius-full);
+  background: var(--neutral-secondary-medium); cursor: pointer; font: inherit; line-height: 1;
+  transition: background .15s, border-color .15s;
+}
+.header-right .header-user-btn:hover,
+.header-right .header-user-btn[aria-expanded="true"] {
+  background: var(--neutral-tertiary-medium); border-color: var(--border-default-strong);
+}
+/* (0,3,0) 高特異度:勝過 base.css ≤768 的 .header-right span:not(.header-user) 隱藏,確保頭像永遠在 */
+.header-right .header-user-btn .header-user-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius-full);
+  /* icon 與底色對調:深底 + 淺 icon */
+  background: var(--text-body); color: var(--neutral-tertiary); font-size: 15px; flex-shrink: 0;
+}
+.header-right .header-user-btn .header-user-name {
+  display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px; font-weight: 500; color: var(--text-heading);
+}
+.header-user-caret { font-size: 11px; color: var(--text-body-subtle); transition: transform .2s ease; }
+.header-user-caret.open { transform: rotate(180deg); }
+
+.header-user-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 1100;
+  min-width: 248px; padding: 6px;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  transform-origin: top right;
+}
+@keyframes hdrUserIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 進場 / 退場(收起也有動畫):退場 = 同 keyframe 反向播放 */
+.hdr-user-enter-active { animation: hdrUserIn .16s ease-out; }
+.hdr-user-leave-active { animation: hdrUserIn .14s ease-in reverse; }
+.header-user-head { padding: 10px 12px 8px; }
+.header-user-head-name { font-size: 14px; font-weight: 600; color: var(--text-heading); line-height: 1.3; }
+.header-user-head-email { font-size: 13px; color: var(--text-body-subtle); margin-top: 2px; overflow-wrap: anywhere; }
+.header-user-sep { height: 1px; background: var(--border-default); margin: 6px 0; }
+.header-user-logout-form { margin: 0; }
+.header-user-menu .header-user-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 12px; border: 0; background: transparent; border-radius: var(--radius-md);
+  font: inherit; font-size: 14px; font-weight: 500; color: var(--text-body);
+  cursor: pointer; text-align: left; transition: background .15s, color .15s;
+}
+.header-user-menu .header-user-item :where(i, .lucide) { width: 16px; height: 16px; font-size: 14px; text-align: center; color: var(--text-body-subtle); }
+.header-user-menu .header-user-item:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.header-user-menu .header-user-item:hover :where(i, .lucide) { color: var(--text-heading); }
+/* 登出 hover = 一般中性灰(同其他項、對齊截圖),不用紅色 */
+/* base.css 在 ≤768 會隱藏 .header-right 內非 .header-user 的 span;下拉內文字要顯示回來 */
+.header-right .header-user-menu span { display: inline; }
+@media (max-width: 480px) { .header-right .header-user-btn .header-user-name { display: none; } }
+
+/* 側邊欄:256px、neutral-primary-soft 底、右側 1px 分隔 */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--neutral-primary-soft);
+  border-right: 1px solid var(--border-default);
+  box-shadow: none;
+  overflow-x: hidden;
+  transition: width .3s cubic-bezier(.22, 1, .36, 1), transform .3s ease;
+}
+.sidebar::-webkit-scrollbar-thumb { background: var(--neutral-quaternary); }
+.sidebar-nav { padding: 8px 0; }
+
+/* 導覽項:沿用原本間距/尺寸(base.css 的 padding 12/16、margin 4/12;icon 18px/14px、字 14px);
+   本次只換配色與字重 — 字偏細(400,CJK 在 500 會顯粗)、icon body-subtle 色 */
+.sidebar .menu-item,
+.sidebar .submenu-toggle {
+  width: calc(100% - 24px);
+  min-height: var(--control-height);
+  margin: 3px 12px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+  color: var(--text-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: calc(var(--control-height) - 2px);
+  overflow: hidden;
+  /* active 切換的淡入淡出:背景/文字色平滑過渡(SPA 下側邊欄 DOM 不重建,故切頁時舊 pill 淡出、新 pill 淡入)。
+     .18s + ease-out:俐落、不拖,選中狀態淡淡地切過去而非瞬間跳。 */
+  transition: color .18s cubic-bezier(.4, 0, .2, 1), background-color .18s cubic-bezier(.4, 0, .2, 1), padding .35s cubic-bezier(.22, 1, .36, 1);
+}
+.sidebar .menu-item :where(i, .lucide),
+.sidebar .submenu-toggle :where(i, .lucide) {
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  margin-right: 10px;
+  color: var(--text-body-subtle);
+  /* icon 顏色與文字同步淡入淡出(原 .075s 太快,會「字先變、icon 後變」割裂感) */
+  transition: color .18s cubic-bezier(.4, 0, .2, 1);
+  flex-shrink: 0;
+}
+/* hover:只改文字/icon 顏色,不加底色(非 active 才套,避免蓋掉 active) */
+.sidebar .menu-item:not(.active):hover,
+.sidebar .submenu-toggle:not(.active):hover { background: transparent; color: var(--text-heading); }
+.sidebar .menu-item:not(.active):hover :where(i, .lucide),
+.sidebar .submenu-toggle:not(.active):hover :where(i, .lucide) { color: var(--text-heading); }
+
+/* active:球場主色淡底 pill + 球場主色字/icon(本來的後台選取處理) */
+.sidebar .menu-item.active {
+  background: var(--brand-softer);
+  color: var(--fg-brand);
+  font-weight: 500;
+}
+.sidebar .submenu-toggle:has(+ .submenu:not(.show) .submenu-item.active) {
+  background: var(--brand-softer);
+  color: var(--fg-brand);
+  font-weight: 500;
+}
+.sidebar .menu-item.active :where(i, .lucide) { color: var(--fg-brand); }
+.sidebar .submenu-toggle:has(+ .submenu:not(.show) .submenu-item.active) :where(i, .lucide) { color: var(--fg-brand); }
+.sidebar .menu-item.active::before { display: none; }
+
+/* 子選單(截圖風):移除左側導引線 + 子項 icon(已從 markup 拿掉),純文字縮排。
+   text 對齊父層「標籤」起點 ≈ 44px(item 內距 12px → 文字落在 56px,與父層 icon+gap 後的標籤同列),
+   覆寫 base.css:291-296 的 border-left / padding-left(b_admin 後載入,同特異度靠順序勝出,免 !important)。 */
+.sidebar .submenu { border-left: none; margin-left: 0; margin-right: 0; padding-left: 0; }
+.sidebar .submenu .menu-item {
+  width: calc(100% - 24px);
+  min-height: 32px;
+  margin: 2px 12px;
+  padding: 0 10px 0 40px;
+  line-height: 30px;
+}
+
+.menu-divider { height: 1px; background: var(--border-default); margin: 12px 0; }
+
+/* 收合鈕(左下小圖示鈕) */
+.sidebar-toggle { padding: 12px; border-top: none; }
+.toggle-btn {
+  width: 32px; height: 32px; padding: 0;
+  background: transparent; border: none; border-radius: var(--radius-md);
+  color: var(--text-body); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+.toggle-btn:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.panel-left-fill { transition: opacity .2s ease; }
+.sidebar.collapsed .panel-left-fill { opacity: 0; }
+
+/* ── 收合軌:icon 置中於 40px 卡片、label 淡出 ── */
+.main-content { transition: margin-left .3s cubic-bezier(.22, 1, .36, 1); }
+
+/* ── SPA 換頁:抽換 #main-content 時的純淡入淡出(crossfade,只動 opacity、不位移) ── */
+/* 載入態(變灰)只在 fetch >180ms 才由 spa.js 加上;多數情況不變灰、直接淡入新內容 → 俐落無停頓。 */
+.main-content.is-spa-loading { opacity: .55; transition: opacity .1s ease; pointer-events: none; }
+@keyframes b-spa-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.main-content.is-spa-entered { animation: b-spa-fade-in .12s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .main-content.is-spa-loading { opacity: 1; }
+  .main-content.is-spa-entered { animation: none; }
+}
+
+/* ── Flash toast:右下角,從右側滑入→停留→滑出。白底淺灰邊框,狀態只用不同顏色 icon 區分。
+   ★ 用純 CSS animation 自動播放(滑入→停留→滑出),不依賴 JS 加 class →
+     整頁重載/SPA 下都鐵定看得到,JS 只負責動畫結束後移除節點。 ── */
+.b-toast-wrap {
+  position: fixed; right: 20px; bottom: 20px; z-index: 2000;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+  pointer-events: none;            /* 容器不擋點擊 */
+}
+.b-toast {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 240px; max-width: 360px;
+  padding: 12px 16px;
+  background: var(--neutral-primary-soft, #fff);
+  border: 1px solid var(--border-default, #E5E7EB);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  color: var(--text-heading, #111827);
+  font-size: 14px; font-weight: 500; line-height: 1.45;
+  /* 滑入(.34s)→停留(到 ~92%)→滑出(尾段);總長由 animation-duration 控制(JS 設 4.4s) */
+  animation: b-toast-life 4.4s cubic-bezier(.22, 1, .36, 1) both;
+  will-change: transform, opacity;
+}
+@keyframes b-toast-life {
+  0%   { transform: translateX(calc(100% + 28px)); opacity: 0; }
+  8%   { transform: translateX(0); opacity: 1; }       /* 約 .35s 滑入完成 */
+  90%  { transform: translateX(0); opacity: 1; }       /* 停留 */
+  100% { transform: translateX(calc(100% + 28px)); opacity: 0; }  /* 滑出 */
+}
+.b-toast-icon { flex-shrink: 0; display: inline-flex; }
+.b-toast-icon :where(i, .lucide, svg) { width: 20px; height: 20px; }
+.b-toast-msg { flex: 1; }
+/* 狀態:只染 icon 顏色(卡片維持白底淺灰邊框) */
+.b-toast-success .b-toast-icon { color: var(--fg-success, #047857); }
+.b-toast-danger  .b-toast-icon { color: var(--fg-danger, #BE123C); }
+.b-toast-warning .b-toast-icon { color: #F97316; }   /* 明確鮮橘(token --fg-warning 偏深褐,toast 用亮橘較清楚) */
+@media (prefers-reduced-motion: reduce) {
+  .b-toast { animation: b-toast-fade 4.4s ease both; }
+  @keyframes b-toast-fade { 0%{opacity:0} 8%{opacity:1} 90%{opacity:1} 100%{opacity:0} }
+}
+
+/* 內容區內距:上/左維持 24px,右/下收到 8px(使用者要求,全後台頁面)。
+   覆寫 base.css 的 .main-content { padding:24px }。 */
+.main-content { padding: 24px 8px 8px 24px; }
+/* 固定高度模型(opt-in,由內頁 {% block main_modifier %}is-fixed-h{% endblock %} 開啟):
+   外殼吃「視窗剩餘高度」、不撐高 body;page-header 與固定區(表單/篩選)留在上方,
+   其後的 .b-tbl-scroll 吃剩餘高度內滾、thead sticky 釘住、外層整頁不滾。
+   ⚠️ 只給「上方固定 + 下方單表內滾」的頁(桿弟三頁、之後 bookings 等寬表);
+   內容型/可超長捲動頁(如 dashboard 雙欄)不開,維持預設整頁滾。
+   header 是 fixed(base.css)、body 已 padding-top:header,故可用高 = 100vh - header。 */
+.main-content.is-fixed-h {
+  height: calc(100vh - var(--header-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;            /* 外層不滾;捲動交給內部 .b-tbl-scroll */
+}
+/* 固定區(page-header、上方表單/篩選等所有非滾動子項)不被壓縮,維持原高;
+   只有 .b-tbl-scroll 吃剩餘空間。避免矮視窗下表單被 flex 壓扁。 */
+.main-content.is-fixed-h > :not(.b-tbl-scroll) { flex: 0 0 auto; }
+/* 表格被包在 <form> 裡又要內滾(如多語內容:整張表需一起送出)時,
+   form 本身當作 fixed-h 的伸展子項 → 內部 .b-tbl-scroll 才吃得到剩餘高度、thead 才釘得住。
+   form 自身變 flex 欄:表格區伸展內滾、儲存鈕(非 scroll 子項)固定不縮。通用,非單頁 hack。 */
+.main-content.is-fixed-h > form.is-fixed-h-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;        /* 表格區滿寬 */
+}
+/* 但按鈕等非表格子項不該被 column flex 拉伸成滿寬 → 個別退回自身寬度、靠左 */
+.main-content.is-fixed-h > form.is-fixed-h-form > .b-btn { align-self: flex-start; }
+.main-content.is-fixed-h > form.is-fixed-h-form > :not(.b-tbl-scroll) { flex: 0 0 auto; }
+/* 直向內滾容器(全後台通用):放在 .main-content flex 流中。
+   ★ 行為:資料少 → 框貼合內容高度(不撐滿、無多餘空白);
+          資料多到超過剩餘空間 → 上限封頂、框內自滾、thead 釘住。
+   做法:flex:0 1 auto(可縮不可長,高度由內容決定)+ min-height:0(允許縮到比內容小才能內滾)。
+   不寫死 max-height:剩餘空間由 .main-content 這個固定高 flex 容器的「可用高」自然封頂,
+   表格內容低於可用高就貼合、超過就被 flex 收縮觸發 overflow 內滾。
+   寬表同時要橫滾 → overflow:auto 兩軸都接;細捲軸沿用 token 配色。 */
+.b-tbl-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+.b-tbl-scroll .b-tbl,
+.b-tbl-scroll .b-tbl-wrap { border: 0; box-shadow: none; }
+/* 局部內滾:頁面沒套 is-fixed-h(如 billing 上方有 KPI/切換/篩選,不宜整頁固定高)時,
+   給表格自己一個 max-height 上限,超過就框內滾、thead 一樣釘住;不影響整頁佈局。 */
+/* billing 資料區:固定高頁面(.main-content.is-fixed-h)裡的 flex 子項。
+   ★ flex:0 1 auto(可縮不可撐)→ 內容少時貼合內容高度(不留大片空白);
+     內容多到超過剩餘空間才被壓縮、觸發內層框內捲。與 .b-tbl-scroll 同一套自適應模型。
+   切換時只抽換 [data-view-body] 內容,膠囊列不動 → 滑塊平滑滑動、資料區淡入。 */
+.main-content.is-billing-fixed > .b-view-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.b-view-body.is-swapping { opacity: .35; transition: opacity .12s ease; }
+
+/* 彙總:固定框 + 框內卡片捲動,做法對齊排程設定 tab(.b-panel[data-panel="schedule"])。
+   外框(邊框/圓角/shadow/overflow:hidden)永遠完整;捲動移到內層 .b-billing-orders-scroll。
+   flex:0 1 auto → 訂單少時外框貼合卡片總高、不撐滿;訂單多才封頂內滾。 */
+.b-view-body > .b-billing-orders {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  background: var(--neutral-secondary-soft);
+  overflow: hidden;
+}
+.b-billing-orders-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.b-billing-orders-scroll::-webkit-scrollbar { width: 10px; }
+.b-billing-orders-scroll::-webkit-scrollbar-thumb { background: var(--neutral-quaternary); border-radius: var(--radius-full); }
+.b-billing-orders-scroll::-webkit-scrollbar-track { background: transparent; }
+/* 框內訂單卡:貼滿外框寬(去左右圓角/邊框/自帶陰影),上下堆疊;卡間 8px 細縫露外框淡灰底。
+   外框的圓角+邊框負責整體收邊 —— 與排程設定 tab 的 .b-card 規則一致。 */
+.b-billing-orders-scroll > .b-card {
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.b-billing-orders-scroll > .b-card:first-child { border-top: 0; }
+.b-billing-orders-scroll > .b-card + .b-card { margin-top: 8px; }
+/* 篩選 AJAX 抽換時的過場:輕微淡化,避免內容瞬間跳掉的切斷感 */
+.b-tbl-scroll.is-loading { opacity: .5; transition: opacity .12s ease; pointer-events: none; }
+/* thead 釘住:滾動時標題列固定在框頂;sticky 相對 .b-tbl-scroll 這個滾動容器。
+   背景不可透明(否則滾動時看到底下 row 透出),沿用 thead 既有底色。
+   ★ 標題列下方淡分隔線:sticky 時普通 border-bottom 會跟著被裁/不穩,改用 inset box-shadow
+     畫一條 1px 淡線(border-default),滾動時穩定貼在標題列底緣、與內容區隔。 */
+.b-tbl-scroll .b-tbl thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--neutral-secondary-soft);
+  border-bottom: 0;                                    /* 改用下方 box-shadow 畫線,避免 sticky 雙線 */
+  box-shadow: inset 0 -1px 0 var(--border-default);
+}
+.b-tbl-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.b-tbl-scroll::-webkit-scrollbar-thumb { background: var(--neutral-quaternary); border-radius: var(--radius-full); }
+.b-tbl-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 時段管理(slots)固定高佈局 ──────────────────────────────────────
+   需求:整頁外層不捲,捲動只在容器內。但 slots 有 3 個 tab,「排程設定」是長表單。
+   做法:.main-content 固定高(同 is-fixed-h)、外層 overflow:hidden;
+        - page-header / tab 列 = 固定區不縮;
+        - 顯示中的 .b-panel 吃剩餘高(min-height:0 才能讓子層內滾);
+        - 「時段狀態」panel:b-slots-card flex column,格子表框吃剩餘高內滾;
+        - 「排程/球區」panel:長表單 → panel 自己 overflow-y:auto,在自己區塊內捲(儲存鈕捲得到)。
+   （隱藏的 panel 帶 .hidden=display:none 不佔空間,故只有當前 panel 吃高。） */
+.main-content.is-slots-fixed {
+  height: calc(100vh - var(--header-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;                      /* 外層整頁不捲 */
+}
+.main-content.is-slots-fixed > .page-header,
+.main-content.is-slots-fixed > .b-slots-tabs { flex: 0 0 auto; }   /* 標題列、tab 列固定不縮 */
+.main-content.is-slots-fixed > .b-panel:not(.hidden) {
+  flex: 1 1 auto;
+  min-height: 0;                         /* 允許縮到比內容小,子層才能內滾 */
+  display: flex;
+  flex-direction: column;
+}
+/* 排程 tab:panel = 固定收邊框(邊框/圓角/shadow 永遠完整、overflow hidden 讓圓角裁切);
+   捲動移到內層 .b-panel-scroll → 內容超高時在框內捲,外框上下圓角+邊框永不被捲出畫面。
+   內部兩張卡各自保留 .b-card 圓角邊框(獨立容器)→ 外層框吃淡灰底,讓白卡浮出、彼此分開。
+   ⚠️ 球區 tab 資料少,不套此固定框 → 走一般卡片、自然高度。 */
+.main-content.is-slots-fixed > .b-panel[data-panel="schedule"]:not(.hidden) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  background: var(--neutral-secondary-soft);
+  overflow: hidden;
+}
+.main-content.is-slots-fixed > .b-panel[data-panel="schedule"]:not(.hidden) > .b-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* 框內卡片:貼滿外框寬(去左右圓角/邊框、去自帶陰影),上下堆疊。
+   卡間用外框淡灰底露出一道細縫(margin),外框的圓角+邊框負責整體收邊。 */
+.b-panel[data-panel="schedule"] .b-panel-scroll > .b-card {
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+}
+.b-panel[data-panel="schedule"] .b-panel-scroll > .b-card + .b-card {
+  margin-top: 8px;   /* 兩卡之間的細縫(外框淡灰底透出) */
+}
+
+/* 時段狀態大白卡:外觀對齊桿弟長表容器(.b-tbl-scroll)— 白底、token 邊框/圓角、shadow-xs。
+   固定高模式下變 flex column:上方週切換/摘要/篩選固定,格子表框吃剩餘高內滾。 */
+.b-slots-card {
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 20px;
+}
+.main-content.is-slots-fixed .b-panel[data-panel="status"] .b-slots-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 「時間×球區」格子表捲動框。
+   - 固定高模式(時段狀態 tab):吃 b-slots-card 剩餘高(flex:1 1 auto + min-height:0)、框內兩軸滾。
+   - thead 的時間/球區標題列 sticky 釘在框頂。
+   #grid-table 套 .b-tbl 後沿用其表頭/列分隔/字級;格子 cell 仍滿格上色(td 保留 p-0)。 */
+.b-grid-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.b-grid-scroll #grid-table { border: 0; }
+.b-grid-scroll #grid-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--neutral-secondary-soft);
+  box-shadow: inset 0 -1px 0 var(--border-default);
+  text-align: center;   /* 標題列(時間/球區)文字居中,蓋過 .b-tbl thead th 的 left */
+}
+/* 格子列高:壓低垂直內距(蓋過 Tailwind py-2 / .b-cell py-2,需 !important 因 CDN utility 後載入)。
+   時間欄 td 與格子按鈕 .b-cell 一起降,讓每列更緊湊。 */
+.b-grid-scroll #grid-table tbody td { padding-top: 4px; padding-bottom: 4px; }
+.b-grid-scroll #grid-table .b-cell { padding-top: 4px !important; padding-bottom: 4px !important; }
+.b-grid-scroll #grid-table .b-cell.w-full,
+.b-grid-scroll #grid-table td > div { padding-top: 4px; padding-bottom: 4px; }
+
+/* 格子 hover 回饋:標示滑到哪一格。效果放在「有可點按鈕的 <td>」上,貼合表格格線(不描在較小的
+   .b-cell 按鈕邊緣,避免框線跟格線錯位)。hover = td 疊暗底 + 內縮 2px brand 描邊(沿 td 內緣,與格線平行)。
+   .is-active:選單開著時 JS 給被點的 td 加上,維持 hover 外觀直到選單關閉。 */
+.b-grid-scroll #grid-table .b-cell { cursor: pointer; }
+.b-grid-scroll #grid-table td:has(> .b-cell) {
+  transition: box-shadow .12s ease, filter .12s ease;
+}
+/* hover / 選單開著:brand 內框描邊 + 該格「自身底色變暗」(filter,不疊灰) → 保留顏色語意 */
+.b-grid-scroll #grid-table td:has(> .b-cell):hover,
+.b-grid-scroll #grid-table td.is-active {
+  box-shadow: inset 0 0 0 2px var(--brand);
+  filter: brightness(0.94);
+}
+.b-grid-scroll #grid-table .b-cell:focus-visible { outline: none; }
+.b-grid-scroll #grid-table td:has(> .b-cell:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+/* 整列 hover:時間欄輕微高亮,幫視線對齊到這一列 */
+.b-grid-scroll #grid-table .grid-row:hover > td:first-child {
+  background: var(--brand-softer);
+  color: var(--fg-brand);
+}
+
+.b-grid-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.b-grid-scroll::-webkit-scrollbar-thumb { background: var(--neutral-quaternary); border-radius: var(--radius-full); }
+.b-grid-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* 時段格子彈窗(#b-cell-modal)開關動畫:與「新增」modal 一致 = 純 opacity 淡入/淡出 .12s。
+   slots JS 以 .flex 顯示、.is-closing 觸發淡出(非全域 modal 的 is-open 兩段式),
+   故用 @keyframes 在顯示/關閉瞬間自動播放,不依賴 JS 兩段式、也不被全域 modal JS 接管。 */
+#b-cell-modal.flex { animation: b-cell-overlay-in .12s ease-out both; }
+#b-cell-modal.flex .b-modal { animation: b-cell-modal-in .12s ease-out both; }
+/* 關閉:反向淡出(覆蓋上面的淡入 animation) */
+#b-cell-modal.flex.is-closing { animation: b-cell-overlay-out .12s ease-in both; }
+#b-cell-modal.flex.is-closing .b-modal { animation: b-cell-modal-out .12s ease-in both; }
+@keyframes b-cell-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes b-cell-modal-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes b-cell-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes b-cell-modal-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* ════════════════════════════════════════════════════════════════════
+   頁首動作槽 + 右上下拉面板(.b-pop)
+   標題列改兩端對齊(標題左、動作鈕右),動作鈕點開「下拉面板」收納新增/篩選表單。
+   ════════════════════════════════════════════════════════════════════ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.page-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* 下拉容器:相對定位讓面板絕對定位於觸發鈕下方 */
+.b-pop { position: relative; }
+/* 觸發鈕的 caret 開合時翻轉 */
+.b-pop .b-pop-caret { transition: transform .2s ease; font-size: 11px; }
+.b-pop.is-open .b-pop-caret { transform: rotate(180deg); }
+/* 浮出面板:預設收起;is-open 才顯示。靠右對齊觸發鈕、浮在內容之上 */
+.b-pop-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1200;
+  min-width: 320px;
+  padding: 16px;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top right;
+  transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+/* ⚠️ is-open 必須 transform:none(不可留 scale(1))。
+   transform 會建立新 containing block,使面板內 position:fixed 的共用下拉(.b-dd-menu)
+   相對面板而非 viewport 定位 → 選單錯位/看似沒反應。穩定態清掉 transform 才正常。 */
+.b-pop.is-open .b-pop-panel { opacity: 1; visibility: visible; transform: none; }
+.b-pop-panel-title { font-size: 14px; font-weight: 600; color: var(--text-heading); margin: 0 0 12px; }
+
+/* ── 動作菜單(.b-menu)──────────────────────────────────────────────
+   一顆按鈕點開的清單式選項菜單(選動作,非選值);比 .b-pop-panel 小巧。可重用。
+   放在 .b-pop 內:<div class="b-pop"><button>...</button><div class="b-menu">...</div></div> */
+.b-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 1200;
+  min-width: 180px; padding: 6px;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0; visibility: hidden;
+  transform: translateY(-6px) scale(.98); transform-origin: top left;
+  transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+.b-menu.align-right { left: auto; right: 0; transform-origin: top right; }
+.b-pop.is-open > .b-menu { opacity: 1; visibility: visible; transform: none; }
+.b-menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: 0; background: none; border-radius: 8px;
+  font: inherit; font-size: 14px; color: var(--text-body); text-align: left;
+  cursor: pointer; transition: background .12s, color .12s;
+}
+.b-menu-item :where(i, .lucide) { width: 16px; font-size: 14px; color: var(--text-body-subtle); flex: 0 0 auto; }
+.b-menu-item:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.b-menu-item:hover :where(i, .lucide) { color: var(--fg-brand); }
+.b-menu-item:focus-visible { outline: none; background: var(--neutral-secondary-medium); }
+.b-menu-item.is-danger { color: var(--fg-danger); }
+.b-menu-item.is-danger:hover { background: var(--danger-soft); }
+.b-menu-item.is-danger :where(i, .lucide) { color: var(--fg-danger); }
+.b-menu-sep { height: 1px; margin: 5px 6px; background: var(--border-default); }
+
+.menu-text { white-space: nowrap; transition: opacity .18s ease; }
+/* 收合:沿用原本 flex-start + 原間距 → icon 錨在左、置中於 rail 不被裁掉
+   (center 會被「不可收縮的直接文字子節點」推到負 x 而裁掉 icon,如 後台首頁/登出系統) */
+.sidebar.collapsed .menu-item,
+.sidebar.collapsed .submenu-toggle {
+  justify-content: flex-start;
+  min-height: var(--control-height);
+  margin: 3px 12px;
+  padding: 0 10px;
+}
+.sidebar.collapsed .menu-text { display: inline; opacity: 0; }
+.sidebar.collapsed .menu-item :where(i, .lucide),
+.sidebar.collapsed .submenu-toggle :where(i, .lucide) { margin-right: 0; font-size: 14px; }
+.sidebar.collapsed .menu-item.active::before { display: none; }
+
+/* 平滑手風琴:用 grid-template-rows 0fr↔1fr 做動畫(CSS 標準做法)。
+   高度自動貼合內容、展開/收起完全對稱、項目再多也不裁切 —
+   取代舊 max-height 方案(設固定值會讓收起前段空轉、視覺上比展開慢)。
+   需要 markup 在 .submenu 內包一層 .submenu-inner(單一 grid 子項)。 */
+.sidebar .submenu { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s cubic-bezier(.22, 1, .36, 1); }
+.sidebar .submenu.show { grid-template-rows: 1fr; }
+.sidebar .submenu-inner { min-height: 0; overflow: hidden; }
+.menu-caret { font-size: 12px; color: var(--text-body); transition: transform .2s ease; }
+.submenu-toggle.open .menu-caret { transform: rotate(180deg); }
+.sidebar.collapsed .menu-caret { display: none; }
+
+/* ── 收合時群組浮窗(flyout,套 dropdown.md:shadow-lg、8px) ── */
+.cms-flyout {
+  position: fixed; z-index: 1100; min-width: 192px;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+}
+/* 收合軌浮窗展開動畫:乾淨的淡入 + 輕微上移(不橫移、不縮放,避免「歪斜」感)。
+   Vue <transition name="flyout"> 進場套 -enter、離場套 -leave。 */
+.flyout-enter-active { transition: opacity .15s ease, transform .15s cubic-bezier(.22, 1, .36, 1); }
+.flyout-leave-active { transition: opacity .1s ease, transform .1s ease; }
+.flyout-enter-from { opacity: 0; transform: translateY(-4px); }
+.flyout-leave-to { opacity: 0; transform: translateY(-2px); }
+.cms-flyout-title { font-size: 12px; font-weight: 600; color: var(--text-body-subtle); padding: 6px 8px 4px; }
+.cms-flyout-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-radius: var(--radius-md);
+  /* 未選中字色對齊展開側欄項(var(--text-body));hover/active 再各自變色 */
+  color: var(--text-body); font-size: 14px; font-weight: 500;
+  transition: background .15s, color .15s;
+}
+/* 折疊浮窗的 hover/active 對齊「未折疊」側欄項:
+   hover = 只變文字色、無底色(同 .sidebar .menu-item:not(.active):hover);
+   active = 球場色淡底 pill + 球場色字 + 500(同 .sidebar .menu-item.active)。 */
+.cms-flyout-item:hover { background: transparent; color: var(--text-heading); }
+.cms-flyout-item.active { background: var(--brand-softer); color: var(--fg-brand); font-weight: 500; }
+
+/* 頁首 + 白卡 */
+.page-title { font-size: 24px; font-weight: 600; color: var(--text-heading); letter-spacing: 0; }
+.page-subtitle { font-size: 14px; color: var(--text-body-subtle); }
+.content-card {
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 20px; margin-bottom: 20px;
+}
+.section-title { border-left-color: var(--brand); color: var(--text-heading); }
+
+/* ════════════════════════════════════════════════════════════════════
+   共用元件(版型無關 — 不寫死外距 / 位置)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 卡片(cards.md) ── */
+.b-card { background: var(--neutral-primary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-xs); }
+.b-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-default); }
+.b-card-title { font-size: 16px; font-weight: 600; color: var(--text-heading); margin: 0; }
+.b-card-body { padding: 20px; }
+.b-card-interactive { cursor: pointer; transition: background .15s, box-shadow .15s; }
+.b-card-interactive:hover { background: var(--neutral-secondary-medium); box-shadow: var(--shadow-sm); }
+
+/* ── KPI 卡 ── */
+.b-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 900px) { .b-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .b-kpi-grid { grid-template-columns: 1fr; } }
+.b-kpi { background: var(--neutral-primary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-xs); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.b-kpi-head { display: flex; align-items: center; justify-content: space-between; }
+.b-kpi-label { font-size: 14px; color: var(--text-body-subtle); font-weight: 500; }
+.b-kpi-icon { width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--neutral-secondary-soft); color: var(--text-body); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+.b-kpi-value { font-size: 30px; font-weight: 600; letter-spacing: 0; line-height: 1.1; color: var(--text-heading); }
+.b-kpi-foot { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-body-subtle); }
+/* 矮版 KPI 卡:維持大卡形式但收 padding / gap,降低高度(如 billing 上方待辦總額)。 */
+.b-kpi.is-compact { padding: 14px 18px; gap: 6px; }
+
+/* ── 按鈕(buttons.md:8px、shadow-xs + glint、500 medium、三態) ── */
+.b-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--control-height); min-height: var(--control-height);
+  padding: 0 var(--control-pad-x); border-radius: var(--control-radius);
+  font-family: inherit; font-size: 14px; font-weight: 500; line-height: calc(var(--control-height) - 2px);
+  border: 1px solid var(--border-default); background: var(--neutral-primary-soft); color: var(--text-body);
+  box-shadow: var(--shadow-xs), var(--btn-glint);
+  cursor: pointer; white-space: nowrap; box-sizing: border-box; text-decoration: none;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.b-btn :where(i, .lucide) { font-size: 16px; }
+.b-btn:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.b-btn:focus-visible { outline: none; box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--neutral-tertiary-medium); }
+.b-btn-xs { height: 28px; min-height: 28px; padding: 0 10px; font-size: 12px; line-height: 26px; }
+.b-btn-sm { height: 32px; min-height: 32px; padding: 0 12px; font-size: 14px; line-height: 30px; }
+.b-btn-lg { height: 40px; min-height: 40px; padding: 0 18px; font-size: 16px; line-height: 38px; }
+.b-btn-block { width: 100%; }
+/* icon-only:方形、無左右 padding,icon 置中(表格列操作鈕用) */
+.b-btn-icon { width: var(--control-height); padding: 0; }
+.b-btn-icon.b-btn-sm { width: 32px; }
+.b-btn-icon.b-btn-xs { width: 28px; }
+.b-btn-icon.b-btn-lg { width: 40px; }
+
+.b-btn-primary { background: var(--brand); border-color: transparent; color: var(--b-on-primary, #fff); }
+.b-btn-primary:hover { background: var(--brand-strong); color: var(--b-on-primary, #fff); }
+.b-btn-primary:focus-visible { box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--brand-medium); }
+.b-btn-success { background: var(--success); border-color: transparent; color: #fff; }
+.b-btn-success:hover { background: var(--success-strong); color: #fff; }
+.b-btn-success:focus-visible { box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--success-medium); }
+.b-btn-danger { background: var(--danger); border-color: transparent; color: #fff; }
+.b-btn-danger:hover { background: var(--danger-strong); color: #fff; }
+.b-btn-danger:focus-visible { box-shadow: var(--shadow-xs), var(--btn-glint), 0 0 0 4px var(--danger-medium); }
+/* danger-soft:紅字 + 透明淡紅底 + 紅框(危險動作但不搶眼,如「停止」) */
+.b-btn-danger-soft { background: var(--danger-soft); border-color: var(--border-danger-subtle); color: var(--fg-danger-strong); box-shadow: none; }
+.b-btn-danger-soft :where(i, .lucide) { color: var(--fg-danger); }
+.b-btn-danger-soft:hover { background: var(--danger-medium); border-color: var(--border-danger); color: var(--fg-danger-strong); }
+.b-btn-danger-soft:focus-visible { box-shadow: 0 0 0 4px var(--danger-medium); }
+.b-btn-dark { background: var(--dark); border-color: transparent; color: #fff; }
+.b-btn-dark:hover { background: var(--dark-strong); color: #fff; }
+
+/* ghost:無陰影 / 無 glint */
+.b-btn-ghost { background: transparent; border-color: transparent; color: var(--text-heading); box-shadow: none; }
+.b-btn-ghost:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.b-btn-ghost:focus-visible { box-shadow: 0 0 0 4px var(--neutral-tertiary-medium); }
+
+/* quiet:純文字鈕,平時淺灰無底無框無陰影,hover 才亮起來(文字變深 + 淡底)。
+   用於 wizard「上一步」等次要動作 —— 不與主要動作(下一步/送出)競爭視覺。 */
+.b-btn-quiet { background: transparent; border-color: transparent; color: var(--text-body-subtle); box-shadow: none; }
+.b-btn-quiet:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.b-btn-quiet:focus-visible { box-shadow: 0 0 0 4px var(--neutral-tertiary-medium); }
+
+/* filter:平時透明無底無框、字灰;hover 才出現黑 10% 圓角矩形底 + 文字變主題深綠(--fg-brand = 球場主色)。
+   開啟態(.b-pop.is-open)維持 hover 樣式。
+   有套用篩選(.is-active):底色 = 文字色(--fg-brand)10% 透明,文字深綠 → 視覺上「已啟用」。 */
+.b-btn-filter { background: transparent; border-color: transparent; color: var(--text-body); box-shadow: none; border-radius: var(--radius-md); }
+.b-btn-filter:hover,
+.b-pop.is-open .b-btn-filter { background: rgba(0, 0, 0, .1); color: var(--fg-brand); }
+.b-btn-filter:focus-visible { box-shadow: 0 0 0 4px var(--neutral-tertiary-medium); }
+/* 已套用篩選:不要底色,只把文字變主題深綠(--fg-brand);hover 時才出現黑 5% 底(同一般 hover) */
+.b-btn-filter.is-active { background: transparent; color: var(--fg-brand); }
+.b-btn-filter.is-active:hover,
+.b-pop.is-open .b-btn-filter.is-active { background: rgba(0, 0, 0, .05); color: var(--fg-brand); }
+/* 篩選面板底部動作列:重置靠左、套用靠右(space-between),與欄位間留分隔 */
+.b-pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-default); }
+/* 重置:純文字鈕,平常淡(opacity .55)、hover 才變完整文字色;靠左由 b-pop-foot 的 space-between 處理 */
+.b-btn-reset {
+  background: transparent; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--text-body); opacity: .55; text-decoration: none;
+  font-size: 14px; line-height: 1; transition: opacity .15s, color .15s;
+}
+.b-btn-reset:hover { opacity: 1; color: var(--text-heading); }
+/* 篩選 AJAX 抽換表格時的過渡:輕微淡出,避免整頁重整的切斷感(b-filter.js 加上 .is-loading) */
+[data-filter-target] { transition: opacity .15s ease; }
+[data-filter-target].is-loading { opacity: .5; pointer-events: none; }
+
+/* ── 指標旁動作選單(context menu)共用元件:context-menu.js 動態注入 #b-context-menu.b-ctxmenu ──
+   點某元素 → 在指標旁彈出;手風琴展開/收合(max-height 過渡);position:fixed,JS 定位。 */
+.b-ctxmenu {
+  position: fixed;
+  z-index: 1400;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;                 /* 手風琴:超出高度裁切 */
+  max-height: 0;
+  opacity: 0;
+  transition: max-height .18s ease, opacity .16s ease;
+}
+.b-ctxmenu.is-open { opacity: 1; }
+.b-ctxmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-heading);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+/* 項目間淺分隔線(第一項除外);用 border-default 淡化 60%,只作輕微區隔 */
+.b-ctxmenu-item + .b-ctxmenu-item { border-top: 1px solid color-mix(in srgb, var(--border-default) 60%, transparent); }
+.b-ctxmenu-item:hover { background: var(--brand-softer); color: var(--fg-brand); }
+.b-ctxmenu-item:focus-visible { outline: none; background: var(--neutral-tertiary); }
+.b-ctxmenu-item:disabled { color: var(--fg-disabled); cursor: not-allowed; }
+.b-ctxmenu-item i { width: 16px; height: 16px; flex: 0 0 auto; color: var(--text-body-subtle); }
+.b-ctxmenu-item:hover i { color: var(--fg-brand); }
+.b-ctxmenu-item:disabled i { color: var(--fg-disabled); }
+
+.b-btn:disabled, .b-btn.is-disabled, .b-btn[aria-disabled="true"] {
+  background: var(--disabled); border-color: var(--border-default-medium); color: var(--fg-disabled);
+  box-shadow: none; cursor: not-allowed;
+}
+.b-btn:disabled:hover, .b-btn.is-disabled:hover { background: var(--disabled); color: var(--fg-disabled); }
+
+/* text:純文字按鈕(無底 / 無框 / 無陰影、brand 字色)。用於 modal 送出等「只要文字」的主動作。
+   ⚠️ 必須放在 .b-btn:disabled 之後 — 同特異度時靠順序勝出,否則 disabled 灰底會蓋回來。
+   border:0 → 任何狀態都不留邊框形狀(透明 border 仍佔 1px,故設 0)。 */
+.b-btn-text { background: transparent; border: 0; color: var(--fg-brand); box-shadow: none; font-weight: 600; }
+.b-btn-text:hover { background: var(--brand-softer); color: var(--fg-brand-strong); }
+.b-btn-text:focus-visible { box-shadow: 0 0 0 4px var(--brand-medium); }
+/* danger 變體:紅字文字鈕(用於「放棄/刪除」等破壞性但不搶眼的確認動作) */
+.b-btn-text-danger { color: var(--fg-danger); }
+.b-btn-text-danger:hover { background: var(--danger-soft); color: var(--fg-danger-strong, var(--fg-danger)); }
+.b-btn-text-danger:focus-visible { box-shadow: 0 0 0 4px var(--danger-medium); }
+/* disabled:10% 黑文字、完全透明(無底/框/陰影)、不可點 */
+.b-btn-text:disabled, .b-btn-text.is-disabled, .b-btn-text[aria-disabled="true"] {
+  background: transparent; border: 0; box-shadow: none; color: rgba(0, 0, 0, .1); cursor: not-allowed;
+}
+.b-btn-text:disabled:hover, .b-btn-text.is-disabled:hover { background: transparent; box-shadow: none; color: rgba(0, 0, 0, .1); }
+
+/* ── 輸入 / 下拉 / textarea(inputs.md) ── */
+.b-label { display: block; font-size: 14px; font-weight: 500; color: var(--text-heading); margin-bottom: 8px; }
+/* 全部欄位吃同一組 --field-* 參數:固定 height + 左右 padding + line-height 置中 → text/date/select 同高。 */
+.b-input, .b-select, .b-textarea {
+  display: block; width: 100%; box-sizing: border-box;
+  height: var(--field-height); min-height: var(--field-height);
+  padding: 0 var(--field-pad-x); line-height: calc(var(--field-height) - 2px);  /* −上下 border 1px 置中 */
+  font-family: inherit; font-size: var(--field-font-size); color: var(--text-heading);
+  background: var(--neutral-secondary-medium); border: 1px solid var(--border-default-medium);
+  border-radius: var(--field-radius); box-shadow: var(--shadow-xs);
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+/* textarea 例外:多行,不鎖固定高度、回正常 padding 與行高 */
+.b-textarea { height: auto; min-height: 80px; padding: 8px var(--field-pad-x); line-height: 1.5; }
+/* 後台共用下拉 trigger 也吃同一組參數(只覆寫後台,前台仍吃 dropdown.css fallback)。 */
+.main-content .b-dd-trigger {
+  height: var(--field-height) !important; min-height: var(--field-height) !important;
+  padding-top: 0 !important; padding-bottom: 0 !important; padding-left: var(--field-pad-x);
+  border-radius: var(--field-radius);
+}
+.b-input::placeholder, .b-textarea::placeholder { color: var(--text-body); }
+.b-input:hover, .b-select:hover, .b-textarea:hover { border-color: var(--border-default-strong); }
+.b-input:focus, .b-select:focus, .b-textarea:focus { outline: none; border-color: var(--border-brand); box-shadow: 0 0 0 1px var(--brand); }
+.b-input.is-error, .b-select.is-error, .b-textarea.is-error { border-color: var(--border-danger); }
+.b-input.is-error:focus, .b-textarea.is-error:focus { box-shadow: 0 0 0 1px var(--danger); }
+.b-input.is-success, .b-textarea.is-success { border-color: var(--border-success); }
+.b-input:disabled, .b-select:disabled, .b-textarea:disabled { background: var(--disabled); color: var(--fg-disabled); cursor: not-allowed; }
+
+/* ── 表格(tables.md) ── */
+.b-tbl-wrap { background: var(--neutral-primary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-xs); overflow-x: auto; }
+.b-tbl-wrap .b-tbl { border: 0; }
+.b-tbl { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--text-body); background: var(--neutral-primary-soft); }
+.b-tbl thead th {
+  text-align: left; font-weight: 500; color: var(--text-body); font-size: 13px;
+  background: var(--neutral-secondary-soft); padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default); white-space: nowrap;
+}
+.b-tbl tbody td { padding: 14px 16px; border-bottom: 1px solid var(--border-default); color: var(--text-heading); vertical-align: middle; }
+.b-tbl tbody tr:last-child td { border-bottom: none; }
+.b-tbl tbody tr:hover { background: var(--neutral-secondary-soft); }
+.b-tbl th[scope="row"], .b-tbl td.b-th { font-weight: 500; color: var(--text-heading); white-space: nowrap; }
+
+/* ── Badge(badges.md;pill) ── */
+.b-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: var(--radius-full); border: 1px solid transparent;
+  font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap;
+}
+.b-badge.lg { font-size: 14px; padding: 4px 8px; }
+.b-badge.square { border-radius: var(--radius-md); }
+.b-badge .dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; }
+.b-badge.ok, .b-badge.success { background: var(--success-soft); border-color: var(--border-success-subtle); color: var(--fg-success-strong); }
+.b-badge.warn, .b-badge.warning { background: var(--warning-soft); border-color: var(--border-warning-subtle); color: var(--fg-warning); }
+.b-badge.bad, .b-badge.danger { background: var(--danger-soft); border-color: var(--border-danger-subtle); color: var(--fg-danger-strong); }
+.b-badge.brand { background: var(--brand-softer); border-color: var(--border-brand-subtle); color: var(--fg-brand-strong); }
+.b-badge.neutral { background: var(--neutral-secondary-medium); border-color: var(--border-default); color: var(--text-heading); }
+.b-badge.dark { background: var(--dark); border-color: transparent; color: #fff; }
+
+/* ── Segmented control(tabs.md「pills」風,active = brand) ── */
+.b-seg { display: inline-flex; align-items: center; gap: 4px; padding: 3px; background: var(--neutral-secondary-soft); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.b-seg a, .b-seg button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+  border: 0; background: transparent; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-body);
+  cursor: pointer; text-decoration: none; transition: background .15s, color .15s, box-shadow .15s;
+}
+.b-seg a:hover, .b-seg button:hover { color: var(--text-heading); background: var(--neutral-tertiary-medium); }
+.b-seg .active, .b-seg [aria-selected="true"] { background: var(--brand); color: var(--b-on-primary, #fff); box-shadow: var(--shadow-sm); }
+.b-seg .active:hover, .b-seg [aria-selected="true"]:hover { background: var(--brand-strong); color: var(--b-on-primary, #fff); }
+
+/* 膠囊 + 滑塊變體:.b-seg.is-pill 用滑動指示塊(.b-seg-thumb)表示 active,左右切換平滑滑動。
+   滑塊寬度/位移由 JS(pageInit.billing)量測實際選項寬度後設 CSS 變數 --thumb-w/--thumb-x,
+   所以選項貼合文字寬度(不平分、不換行),滑塊仍精準對齊。 */
+.b-seg.is-pill { position: relative; }
+.b-seg.is-pill .b-seg-thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 3px;
+  width: var(--thumb-w, 0); transform: translateX(var(--thumb-x, 0));
+  border-radius: var(--radius-sm);
+  background: var(--brand); box-shadow: var(--shadow-sm);
+  transition: transform .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1);
+  z-index: 0; pointer-events: none;
+}
+.b-seg.is-pill.no-anim .b-seg-thumb { transition: none; }   /* 首次定位不要滑進來 */
+.b-seg.is-pill a, .b-seg.is-pill button {
+  position: relative; z-index: 1; justify-content: center; white-space: nowrap;
+  transition: color .2s ease;
+}
+/* 滑塊畫底色,選項本身不再各自上底色/陰影;字色隨 active 變(白),非 active 深灰 */
+.b-seg.is-pill a:hover, .b-seg.is-pill button:hover { background: transparent; color: var(--text-heading); }
+.b-seg.is-pill .active, .b-seg.is-pill [aria-selected="true"] { background: transparent; box-shadow: none; color: var(--b-on-primary, #fff); }
+.b-seg.is-pill .active:hover, .b-seg.is-pill [aria-selected="true"]:hover { background: transparent; color: var(--b-on-primary, #fff); }
+
+/* ── Tabs(tabs.md「underline」風) ── */
+.b-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-default); }
+.b-tab {
+  display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px;
+  border: 0; background: transparent; border-bottom: 2px solid transparent; border-radius: var(--radius-md) var(--radius-md) 0 0;
+  font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-body);
+  cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.b-tab:hover { color: var(--text-heading); border-bottom-color: var(--border-default-strong); }
+.b-tab.b-tab-active, .b-tab[aria-selected="true"] { color: var(--fg-brand); border-bottom-color: var(--border-brand); }
+/* 面板可見性由各頁 JS 管理(slots 用 Tailwind .hidden 切換);這裡不強加 display,避免蓋掉切換 */
+.b-panel[hidden] { display: none; }
+
+/* ── 空狀態 ── */
+.b-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 64px 24px; }
+.b-empty-icon { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--neutral-secondary-soft); color: var(--text-body); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px; }
+.b-empty-title { font-size: 16px; font-weight: 600; color: var(--text-heading); margin: 0 0 4px; }
+.b-empty-sub { font-size: 14px; color: var(--text-body-subtle); margin: 0; max-width: 340px; line-height: 1.6; }
+
+/* ── Alerts(alerts.md) ── */
+.b-alert { display: flex; gap: 12px; padding: 16px; border: 1px solid transparent; border-radius: var(--radius-md); font-size: 14px; line-height: 1.6; }
+.b-alert-title { font-size: 16px; font-weight: 500; margin: 0 0 2px; }
+.b-alert.brand { background: var(--brand-softer); border-color: var(--border-brand-subtle); color: var(--fg-brand-strong); }
+.b-alert.success { background: var(--success-soft); border-color: var(--border-success-subtle); color: var(--fg-success-strong); }
+.b-alert.danger { background: var(--danger-soft); border-color: var(--border-danger-subtle); color: var(--fg-danger-strong); }
+.b-alert.warning { background: var(--warning-soft); border-color: var(--border-warning-subtle); color: var(--fg-warning); }
+
+/* 既有 inline 警示 pill / 堆疊 */
+.b-status-stack { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.b-alert-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: var(--radius-full); padding: 2px 8px;
+  background: var(--danger-soft); border: 1px solid var(--border-danger-subtle); color: var(--fg-danger-strong);
+  font-size: 12px; font-weight: 500;
+}
+.b-alert-pill::before { content: "!"; font-weight: 700; }
+
+/* ── Icon shape(icon-shapes.md) ── */
+.b-ish { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; flex-shrink: 0; }
+.b-ish-circle { border-radius: var(--radius-full); }
+.b-ish-square { border-radius: var(--radius-md); }
+.b-ish-xs { width: 24px; height: 24px; font-size: 14px; }
+.b-ish-sm { width: 32px; height: 32px; font-size: 16px; }
+.b-ish-md { width: 40px; height: 40px; font-size: 20px; }
+.b-ish-lg { width: 48px; height: 48px; font-size: 24px; }
+.b-ish-xl { width: 56px; height: 56px; font-size: 28px; }
+.b-ish.brand { background: var(--brand-softer); color: var(--fg-brand-strong); }
+.b-ish.gray { background: var(--neutral-secondary-soft); color: var(--text-body); }
+.b-ish.danger { background: var(--danger-soft); color: var(--fg-danger-strong); }
+.b-ish.success { background: var(--success-soft); color: var(--fg-success-strong); }
+.b-ish.warning { background: var(--warning-soft); color: var(--fg-warning); }
+
+/* ── Avatar(avatars.md) ── */
+.b-avatar { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; border-radius: var(--radius-full); background: var(--neutral-tertiary); color: var(--text-body); font-weight: 500; width: 40px; height: 40px; font-size: 14px; flex-shrink: 0; }
+.b-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.b-avatar-square { border-radius: var(--radius-md); }
+.b-avatar-xs { width: 24px; height: 24px; font-size: 11px; }
+.b-avatar-sm { width: 32px; height: 32px; font-size: 12px; }
+.b-avatar-lg { width: 44px; height: 44px; font-size: 16px; }
+.b-avatar-xl { width: 56px; height: 56px; font-size: 18px; }
+
+/* ── Pagination(pagination.md) ── */
+.b-pagination { display: inline-flex; font-size: 14px; }
+.b-pagination a, .b-pagination button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; height: 36px; padding: 0 8px; margin-left: -1px;
+  border: 1px solid var(--border-default-medium); background: var(--neutral-secondary-medium);
+  color: var(--text-body); font-weight: 500; text-decoration: none; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.b-pagination > :first-child { margin-left: 0; border-top-left-radius: var(--radius-md); border-bottom-left-radius: var(--radius-md); }
+.b-pagination > :last-child { border-top-right-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md); }
+.b-pagination a:hover, .b-pagination button:hover { background: var(--neutral-tertiary-medium); color: var(--text-heading); }
+.b-pagination .active { color: var(--fg-brand); background: var(--neutral-tertiary-medium); position: relative; z-index: 1; }
+
+/* ── Modal(modals.md) ── */
+/* 預設隱藏;.is-open(由共用 modal JS 切換)才顯示。z-index 蓋過 header(1000)/下拉(1200)。 */
+.b-modal-overlay {
+  position: fixed; inset: 0; z-index: 1300;
+  background: rgba(0, 0, 0, .5); backdrop-filter: blur(1px);
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+/* 純淡入淡出:JS 先加 .is-visible(display:flex),下一幀加 .is-open(opacity→1)。
+   關閉:移除 .is-open → opacity 淡出 → transition 結束 JS 再移除 .is-visible(display:none)。
+   進場/退場都只動 opacity,不縮放不位移。 */
+.b-modal-overlay.is-visible { display: flex; }
+.b-modal-overlay { opacity: 0; transition: opacity .12s ease; }
+.b-modal-overlay.is-open { opacity: 1; }
+.b-modal { background: var(--neutral-primary); border-radius: 24px; box-shadow: var(--shadow-xl); width: 100%; max-width: 520px; max-height: 90vh; overflow: auto; }
+/* 寬版 modal:電腦螢幕橫向,搭配 body 兩欄表單 → 扁長比例。可重用。 */
+.b-modal.is-wide { max-width: 640px; }
+.b-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-default); }
+.b-modal-title { font-size: 20px; font-weight: 600; color: var(--text-heading); margin: 0; }
+.b-modal-sub { margin: 2px 0 0; font-size: 13px; font-weight: 400; color: var(--text-body-subtle); }
+.b-modal-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 6px; border: 0; background: transparent;
+  border-radius: var(--radius-md); color: var(--text-body-subtle); cursor: pointer;
+  font-size: 16px; transition: background .15s, color .15s;
+}
+.b-modal-close:hover { background: var(--neutral-secondary-medium); color: var(--text-heading); }
+.b-modal-body { padding: 20px; color: var(--text-body); font-size: 16px; line-height: 1.625; }
+.b-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border-default); }
+/* modal 開啟時鎖背景捲動 */
+body.b-modal-lock { overflow: hidden; }
+/* modal 表單:label(block)包 input 時,input 與 label 文字留一點間距;label 本身去掉預設下距交給 grid gap。
+   ⚠️ select 被共用下拉(BDropdown)包成 label > .b-dd > select,select 不再是 label 直接子層,
+      故 .b-dd 也要加進來,否則狀態列少 6px、與其他欄位間距對不齊。 */
+.b-modal-body .b-label { margin-bottom: 0; }
+.b-modal-body .b-label > .b-input,
+.b-modal-body .b-label > .b-select,
+.b-modal-body .b-label > .b-dd,
+.b-modal-body .b-label > .b-textarea { margin-top: 6px; }
+
+/* ── Soft modal(.b-modal.is-soft)──────────────────────────────────────
+   淺灰底、無頭/尾分隔線、輸入區白底細線無陰影、送出鈕純文字。可重用的「填寫表單」modal。 */
+.b-modal.is-soft { background: var(--neutral-secondary-soft); }   /* 淺灰底 */
+.b-modal.is-soft .b-modal-head { border-bottom: 0; padding-bottom: 4px; }   /* 標題列去分隔線 */
+.b-modal.is-soft .b-modal-foot { border-top: 0; padding-top: 4px; }         /* 尾列去分隔線 */
+/* 輸入區/選單:白底、細線(border-default)、無陰影 — 浮在淺灰底上做區隔。
+   .form-input 是 A 端(模擬器後台)欄位 class,一併納入,讓 course_manage 這類 A 端 modal 對齊 soft 風格。 */
+.b-modal.is-soft .b-input,
+.b-modal.is-soft .b-select,
+.b-modal.is-soft .b-textarea,
+.b-modal.is-soft .form-input {
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  box-shadow: none;
+}
+/* 增強後的下拉:wrapper 不畫框(交給 trigger),trigger 對齊白底細線無陰影 */
+.b-modal.is-soft .b-dd.form-input { border: 0; background: none; box-shadow: none; }
+.b-modal.is-soft .b-input:focus,
+.b-modal.is-soft .b-select:focus,
+.b-modal.is-soft .b-textarea:focus,
+.b-modal.is-soft .form-input:focus { border-color: var(--border-brand); box-shadow: none; }
+/* soft modal 內共用下拉(.b-dd-trigger)白底細線無陰影(A/B 端 trigger 皆適用) */
+.b-modal.is-soft .b-dd-trigger,
+.b-modal.is-soft .b-dd.form-input .b-dd-trigger {
+  background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.b-modal.is-soft .b-dd.open .b-dd-trigger,
+.b-modal.is-soft .b-dd.form-input.open .b-dd-trigger { border-color: var(--border-brand); box-shadow: none; }
+
+/* ── Alert / 確認 modal(.b-modal.is-alert)───────────────────────────
+   精簡確認框:比一般 modal 小、無頭尾分隔線、內距收緊、置中。可重用(取代原生 confirm)。 */
+.b-modal.is-alert { width: 100%; max-width: 340px; border-radius: 16px; }
+.b-modal.is-alert .b-alert-body { padding: 24px 24px 4px; text-align: center; }
+.b-modal.is-alert .b-alert-title { font-size: 17px; font-weight: 600; color: var(--text-heading); margin: 0 0 6px; }
+.b-modal.is-alert .b-alert-desc { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-body-subtle); }
+/* 動作列:無分隔線、兩鈕平分置中、按鈕縮小 */
+.b-modal.is-alert .b-alert-foot { display: flex; gap: 8px; padding: 16px; border-top: 0; }
+.b-modal.is-alert .b-alert-foot .b-btn { flex: 1; height: 38px; min-height: 38px; }
+
+/* Alert 頂部圖示:無底色,純狀態色 icon(置中)。可重用。 */
+.b-alert-icon {
+  margin: 0 auto 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 30px; line-height: 1;
+}
+/* lucide 版圖示(BDialog 動態對話框用):svg 不吃 font-size,補明確尺寸 */
+.b-alert-icon :where(.lucide, svg) { width: 30px; height: 30px; }
+.b-alert-icon-danger { color: var(--fg-danger); }
+.b-alert-icon-warn { color: var(--warning-strong, var(--warning)); }
+
+/* 後台 chrome 主色助手:吃球場主色(--brand 已指向 --b-primary) */
+.b-bg { background: var(--brand); color: var(--b-on-primary, #fff) !important; border: 1px solid transparent; }
+.b-text-primary { color: var(--fg-brand); }
+
+/* ════════════════════════════════════════════════════════════════════
+   Retrofit 補丁層 — 仍是裸 Tailwind 的內頁(bookings 表身、c_admin 幾頁)
+   不重寫 markup,先把色票 / 圓角 / 陰影對齊 token,色調一致。
+   ════════════════════════════════════════════════════════════════════ */
+/* ★ 全站欄位統一出口:所有 .main-content 的單行 input / select / textarea 吃同一組 --field-* 參數。
+   高特異度 + !important 收編 base.css/裸 Tailwind,確保「全網頁的輸入框/下拉/選擇器」高度·padding·圓角一致。
+   單行欄位用固定 height + padding 上下 0 + line-height 置中(text padding 8+8、date 原生元件都會撐高,故統一鎖死)。 */
+.main-content input[type="text"],
+.main-content input[type="tel"],
+.main-content input[type="email"],
+.main-content input[type="password"],
+.main-content input[type="date"],
+.main-content input[type="datetime-local"],
+.main-content input[type="time"],
+.main-content input[type="number"],
+.main-content input[type="search"],
+.main-content select {
+  height: var(--field-height) !important; min-height: var(--field-height) !important;
+  padding: 0 var(--field-pad-x) !important; line-height: calc(var(--field-height) - 2px) !important;
+  border: 1px solid var(--border-default-medium) !important;
+  border-radius: var(--field-radius) !important;
+  background: var(--neutral-secondary-medium);
+  color: var(--text-heading);
+  font-size: var(--field-font-size);
+  box-shadow: var(--shadow-xs);
+}
+.main-content textarea {
+  min-height: 80px !important; height: auto !important;
+  padding: 8px var(--field-pad-x) !important; line-height: 1.5 !important;
+  border: 1px solid var(--border-default-medium) !important;
+  border-radius: var(--field-radius) !important;
+  background: var(--neutral-secondary-medium);
+  color: var(--text-heading); font-size: var(--field-font-size); box-shadow: var(--shadow-xs);
+}
+.main-content input[type="date"]::-webkit-calendar-picker-indicator { margin: 0; }
+.main-content input:focus,
+.main-content textarea:focus,
+.main-content select:focus {
+  outline: none;
+  border-color: var(--border-brand) !important;
+  box-shadow: 0 0 0 1px var(--brand);
+}
+.main-content table { font-size: 14px; color: var(--text-heading); }
+.main-content thead { background: var(--neutral-secondary-soft); }
+.main-content thead th {
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-default);
+}
+.main-content tbody tr { transition: background .12s ease; }
+.main-content tbody tr:hover { background: var(--neutral-secondary-soft); }
+.main-content .rounded.border.bg-white,
+.main-content .rounded-lg.border.bg-white,
+.main-content .rounded-xl.border.bg-white,
+.main-content .overflow-x-auto.rounded.border.bg-white,
+.main-content .overflow-hidden.rounded.border.bg-white {
+  border-color: var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-xs) !important;
+}
+.main-content button.b-bg,
+.main-content a.b-bg,
+.main-content .b-bg {
+  background: var(--brand);
+  color: var(--b-on-primary, #fff) !important;
+}
+.main-content button.b-bg:hover,
+.main-content a.b-bg:hover,
+.main-content .b-bg:hover { background: var(--brand-strong); }
+.main-content button.rounded.bg-gray-700,
+.main-content button.rounded.b-bg,
+.main-content button.rounded.bg-green-700,
+.main-content button.rounded.bg-gray-500,
+.main-content button.rounded.bg-amber-600,
+.main-content button.rounded.bg-red-600,
+.main-content a.rounded.b-bg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height);
+  padding: 0 var(--control-pad-x) !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500;
+  line-height: calc(var(--control-height) - 2px);
+}
+
+/* ── 手機(≤1024):側邊欄展開覆蓋、收合鈕隱藏 ── */
+@media (max-width: 1024px) {
+  .sidebar.collapsed .menu-text { opacity: 1 !important; }
+  .sidebar.collapsed .menu-caret { display: inline-block !important; }
+  .cms-flyout { display: none; }
+  .sidebar .menu-item,
+  .sidebar .submenu-toggle {
+    min-height: var(--control-height) !important;
+    margin: 3px 12px !important;
+    padding: 0 12px !important;
+  }
+  .sidebar .submenu .menu-item {
+    min-height: 32px !important;
+    margin: 2px 12px !important;
+    padding: 0 10px 0 40px !important;
+  }
+}
+
+/* ≤768:頂部 logo 區不再硬留 132px 空位(無 logo 圖時會把 header-right 擠出畫面) */
+@media (max-width: 768px) {
+  .header-logo .logo-icon { min-width: 0; width: auto; max-width: 112px; flex: 0 1 auto; }
+  .header-right { gap: 14px; }
+}
+
+/* ── 儀表板:不對稱雙欄(左大清單 / 右窄輔助) ── */
+.b-dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px; align-items: stretch; }
+.b-dash-side { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 24px; }
+.b-dash-side > .b-card:last-child { display: flex; flex-direction: column; }
+.b-dash-side > .b-card:last-child .b-quick { flex: 1; align-items: center; }
+@media (max-width: 1024px) {
+  .b-dash-grid { grid-template-columns: 1fr; }
+  .b-dash-side { display: flex; flex-direction: column; }
+  .b-dash-side > .b-card:last-child { display: block; }
+  .b-dash-side > .b-card:last-child .b-quick { flex: none; }
+}
+
+/* 待辦列(右欄):一行一項,左標籤右數字;有缺口時 highlight */
+.b-todo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border-default); }
+.b-todo:last-child { border-bottom: none; }
+.b-todo-label { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-body); }
+.b-todo-label :where(i, .lucide) { width: 16px; height: 16px; text-align: center; color: var(--text-body-subtle); }
+.b-todo-num { font-size: 18px; font-weight: 600; color: var(--text-heading); font-variant-numeric: tabular-nums; }
+.b-todo.is-alert .b-todo-num { color: var(--fg-danger); }
+.b-todo.is-alert .b-todo-label :where(i, .lucide) { color: var(--fg-danger); }
+.b-todo.is-zero .b-todo-num { color: var(--text-body-subtle); font-weight: 500; }
+
+/* 快速動作:三按鈕並排,icon 在上、字在下 */
+.b-quick { display: flex; gap: 10px; padding: 16px 20px; }
+.b-quick-btn {
+  flex: 1; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 6px; border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--neutral-primary-soft); color: var(--text-body);
+  font-size: 13px; font-weight: 500; text-decoration: none; text-align: center; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.b-quick-btn :where(i, .lucide) { font-size: 14px; color: var(--text-body-subtle); transition: color .15s; }
+.b-quick-btn:hover { background: var(--brand-softer); border-color: var(--border-brand-subtle); color: var(--fg-brand-strong); box-shadow: var(--shadow-xs); }
+.b-quick-btn:hover :where(i, .lucide) { color: var(--fg-brand); }
+.b-quick-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* 左欄主清單:固定最小高度,讓空/少資料時仍維持結構對稱 */
+.b-dash-main { min-height: 600px; display: flex; flex-direction: column; }
+.b-dash-main .b-tbl-wrap { flex: 1; }
+.b-dash-main .b-empty { flex: 1; }
+
+/* 佔用率長條(右欄):純 CSS,吃球場主色 */
+.b-occ { display: flex; flex-direction: column; gap: 14px; padding: 16px 20px; }
+.b-occ-row { display: flex; flex-direction: column; gap: 6px; }
+.b-occ-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.b-occ-name { color: var(--text-heading); font-weight: 500; }
+.b-occ-val { color: var(--text-body-subtle); font-variant-numeric: tabular-nums; }
+.b-occ-track { height: 8px; border-radius: 9999px; background: var(--neutral-tertiary); overflow: hidden; }
+.b-occ-fill { height: 100%; border-radius: 9999px; background: var(--brand); transition: width .4s cubic-bezier(.22, 1, .36, 1); }
+.b-occ-fill.is-full { background: var(--fg-danger); }
+
+/* Typography weight scale: keep the course admin calm and scannable. */
+.main-content {
+  --b-font-body: 400;
+  --b-font-emphasis: 400;
+  --b-font-section: 500;
+  --b-font-title: 500;
+  --b-font-metric: 600;
+  font-weight: var(--b-font-body);
+}
+
+.main-content .font-semibold,
+.main-content .font-bold,
+.main-content .font-extrabold,
+.main-content .font-black,
+.main-content strong,
+.main-content b {
+  font-weight: var(--b-font-emphasis);
+}
+
+.main-content label,
+.main-content .b-label,
+.main-content th,
+.main-content .b-tbl thead th,
+.main-content .b-tbl th[scope="row"],
+.main-content .b-tbl td.b-th,
+.main-content .b-badge,
+.main-content .b-alert-pill,
+.main-content .b-alert-pill::before,
+.main-content .b-btn,
+.main-content .b-tab,
+.main-content .b-seg a,
+.main-content .b-seg button,
+.main-content .b-pagination a,
+.main-content .b-pagination button {
+  font-weight: var(--b-font-emphasis);
+}
+
+.main-content .b-card-title,
+.main-content .b-pop-panel-title,
+.main-content .b-empty-title,
+.main-content .b-modal-title,
+.main-content .text-xl.font-bold,
+.main-content .text-xl.font-semibold,
+.main-content .text-lg.font-bold,
+.main-content .text-lg.font-semibold,
+.main-content .text-base.font-bold,
+.main-content .text-base.font-semibold,
+.main-content h2.font-bold,
+.main-content h3.font-bold {
+  font-weight: var(--b-font-section);
+  letter-spacing: 0;
+}
+
+.main-content .page-title,
+.main-content .b-kpi-value,
+.main-content .text-2xl.font-bold,
+.main-content .text-2xl.font-semibold,
+.main-content .text-3xl.font-bold,
+.main-content .text-3xl.font-semibold {
+  font-weight: var(--b-font-title);
+  letter-spacing: 0;
+}
+
+.main-content .b-todo-num,
+.main-content .b-kpi-value,
+.main-content .b-todo.is-alert .b-todo-num {
+  font-weight: var(--b-font-metric);
+}
+
+.main-content td.font-bold,
+.main-content td.font-semibold,
+.main-content .num.font-bold,
+.main-content .num.font-semibold {
+  font-weight: var(--b-font-emphasis);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   報到掃描(checkin):左右雙欄 — 左掃描/手動、右結果卡。桌機 only。
+   ════════════════════════════════════════════════════════════════════ */
+/* 報到頁採固定高模型(is-fixed-h):整頁鋪滿到視窗底,兩欄卡撐滿等高。
+   grid 是 .main-content flex 流中唯一要伸展的子項 → 覆寫 is-fixed-h 的 flex:0 0 auto。 */
+.main-content.is-checkin-fixed > .b-checkin-grid { flex: 1 1 auto; min-height: 0; }
+.b-checkin-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: stretch; margin-top: 4px; }
+
+/* 兩欄卡都撐滿 grid 高度;各自 head 固定、body 內滾(內容超出才滾) */
+.b-checkin-scan, .b-checkin-result { display: flex; flex-direction: column; min-height: 0; }
+/* 左卡 body 變 flex 欄:相機框吃剩餘高度、其餘(提示/按鈕/手動)固定在下方,消除底部留白 */
+.b-checkin-scan > .b-card-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.b-checkin-result > .b-card-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; }
+
+/* 手機單欄:解除固定高與內滾,回到自然高度整頁捲動 */
+@media (max-width: 1024px) {
+  .main-content.is-checkin-fixed { height: auto; overflow: visible; }
+  .main-content.is-checkin-fixed > .b-checkin-grid { flex: 0 0 auto; }
+  .b-checkin-grid { grid-template-columns: 1fr; align-items: start; }
+  .b-checkin-scan, .b-checkin-result { display: block; }
+  .b-checkin-scan > .b-card-body, .b-checkin-result > .b-card-body { display: block; overflow: visible; }
+  /* 單欄無等高可填 → 相機框退回 1:1 正方形 */
+  .b-cam { flex: none; aspect-ratio: 1 / 1; }
+}
+
+/* 相機取景框:吃掉左卡剩餘高度(填滿、消除底部留白),最低仍保留 240px 可辨識;
+   影片以 object-fit:cover 填滿框、不變形。手機單欄時退回 1:1(見 RWD 區)。 */
+.b-cam { position: relative; flex: 1; min-height: 240px; width: 100%; border-radius: var(--radius-md); overflow: hidden; background: #0b0f14; }
+/* 提示/按鈕/手動輸入:固定高、不被相機框的 flex:1 拉伸 */
+.b-checkin-hint, .b-checkin-actions, .b-checkin-manual { flex: 0 0 auto; }
+.b-cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.b-cam-idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; color: rgba(255, 255, 255, .82); background: linear-gradient(180deg, #12181f 0%, #0b0f14 100%); }
+.b-cam-idle.hidden { display: none; }
+.b-cam-idle-icon :where(i, .lucide, svg) { width: 40px; height: 40px; opacity: .7; }
+.b-cam-idle-text { font-size: 13px; line-height: 1.6; max-width: 240px; margin: 0; }
+
+.b-checkin-hint { margin: 10px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-body-subtle); }
+.b-checkin-actions { display: flex; gap: 8px; margin-top: 14px; }
+.b-checkin-actions .b-btn { flex: 1; }
+
+.b-checkin-manual { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-default); }
+.b-checkin-manual .b-label { margin-bottom: 8px; }
+.b-checkin-manual-row { display: flex; gap: 8px; }
+.b-checkin-manual-row .b-input { flex: 1; }
+.b-checkin-manual-row .b-btn { flex-shrink: 0; }
+
+/* 右欄:結果狀態 */
+.b-checkin-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 48px 24px; color: var(--text-body-subtle); font-size: 14px; }
+.b-spin { animation: b-spin 1s linear infinite; }
+@keyframes b-spin { to { transform: rotate(360deg); } }
+
+/* 查詢結果明細卡 */
+.b-checkin-detail { display: flex; flex-direction: column; gap: 16px; }
+.b-checkin-code { font-size: 22px; font-weight: 600; color: var(--text-heading); word-break: break-all; }
+.b-checkin-guest { font-size: 15px; color: var(--text-heading); }
+.b-checkin-guest span { margin-left: 10px; color: var(--text-body-subtle); font-size: 14px; }
+.b-checkin-meta { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 16px 0; border-top: 1px solid var(--border-default); border-bottom: 1px solid var(--border-default); }
+.b-checkin-meta > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.b-checkin-meta dt { font-size: 13px; color: var(--text-body-subtle); margin: 0; }
+.b-checkin-meta dd { font-size: 14px; color: var(--text-heading); margin: 0; text-align: right; }
+.b-checkin-confirm { margin-top: 4px; }
+
+/* 報到成功:大色塊 */
+.b-checkin-done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 40px 24px; border-radius: var(--radius-md); background: var(--success-soft); }
+.b-checkin-done-icon { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: var(--radius-full); background: var(--success); color: #fff; }
+.b-checkin-done-icon :where(i, .lucide, svg) { width: 34px; height: 34px; }
+.b-checkin-done-title { margin: 4px 0 0; font-size: 20px; font-weight: 600; color: var(--fg-success-strong); }
+.b-checkin-done-code { font-size: 15px; color: var(--fg-success); word-break: break-all; }
+
+/* ════════════════════════════════════════════════════════════════════
+   前台主題(theme):左設定表單(細長 340px)+ 右真前台 iframe 即時預覽。
+   固定高(is-fixed-h)整頁鋪滿;桌機 only。
+   ════════════════════════════════════════════════════════════════════ */
+.main-content.is-theme-fixed > .b-theme-grid { flex: 1 1 auto; min-height: 0; }
+.b-theme-grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; align-items: stretch; margin-top: 4px; }
+
+/* 兩欄卡撐滿等高,head 固定 */
+.b-theme-form, .b-theme-preview-card { display: flex; flex-direction: column; min-height: 0; }
+.b-theme-preview-card > .b-card-body { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* 左欄:form 為 flex 欄 → 欄位區內滾、儲存區固定在底部 */
+.b-theme-form-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* 欄位區:每個欄位群組之間固定 20px;群組「內」統一由 gap 控制,不用零散 margin。 */
+.b-theme-fields { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 20px; padding: 20px; }
+
+/* 統一欄位群組:label 在上、控件在下,群組內固定 8px。
+   .b-label 本身當作 flex 欄容器(它包住控件的欄位:主色/點綴色/字型/文案),
+   .b-img-upload 也是同一種欄容器(label + 縮圖 + 檔案控件 + 上傳鈕)。 */
+.b-theme-fields > .b-label,
+.b-theme-fields > .b-img-upload { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+/* 群組內 label 文字:欄容器的第一個文字節點,固定樣式(.b-label 已有字級/色) */
+.b-theme-fields > .b-img-upload > .b-label { margin: 0; }
+
+/* 每個設定區塊的標題:加粗 + 深色,製造分區感(提高特異度以贏過 .main-content 字重規則) */
+.main-content .b-label.b-field-title { font-size: 14px; font-weight: 600; color: var(--text-heading); }
+
+/* 圖片區塊:標題列(標題靠左 + 選擇並上傳鈕靠右,兩者垂直置中對齊)
+   關鍵:.b-label 預設帶 margin-bottom:8px,在 flex 列裡會把標題文字往上頂 → 這裡歸零,
+        標題與按鈕同 32px 高 + align-items:center → 文字中心落在同一水平線。 */
+.b-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.b-field-head .b-field-title {
+  display: flex; align-items: center; flex: 1; min-width: 0;
+  height: 32px; margin: 0; line-height: 1;
+}
+/* 純文字上傳鈕:去掉右側 padding 讓文字靠右切齊欄位邊緣;同 32px 高、行高歸 1 靠 flex 置中 */
+.b-field-head .b-file-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding-right: 0; padding-left: 8px; line-height: 1; cursor: pointer; }
+.b-field-head .b-file-btn :where(i, .lucide, svg) { width: 15px; height: 15px; flex-shrink: 0; }
+/* 預設灰、hover「亮起」成品牌色(無底色);文字亮度變化明顯 */
+.b-field-head .b-file-btn { color: var(--text-body-subtle); }
+.b-field-head .b-file-btn:hover { background: transparent; color: var(--fg-brand); }
+.b-field-head .b-file-btn:hover :where(i, .lucide, svg) { color: var(--fg-brand); }
+.b-field-head .b-file-btn:focus-visible { box-shadow: none; }
+
+/* 隱藏原生 file input(label 觸發) */
+.b-file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* 圖片框:有圖顯示縮圖,沒圖(.is-empty)顯示空狀態提示 */
+.b-img-frame { position: relative; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; background: var(--neutral-secondary-soft); }
+.b-theme-logo-frame { height: 64px; }
+.b-theme-hero-frame { height: 120px; }
+.b-theme-logo-thumb { display: block; height: 100%; width: 100%; margin: 0; border: 0; border-radius: 0; object-fit: contain; }
+.b-theme-hero-thumb { display: block; height: 100%; width: 100%; margin: 0; border: 0; border-radius: 0; object-fit: cover; }
+.b-img-empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--text-body-subtle); }
+.b-img-empty :where(i, .lucide, svg) { width: 16px; height: 16px; }
+.b-img-upload.is-empty .b-img-empty { display: flex; }
+
+/* 上傳狀態:按鈕文字換色 */
+[data-file-name].is-uploading { color: var(--fg-brand); }
+[data-file-name].is-error { color: var(--fg-danger); }
+.b-img-upload.is-uploading .b-file-btn { opacity: .6; pointer-events: none; }
+
+/* 儲存區:固定在左卡底部(不隨欄位內滾),上細分隔線 */
+.b-theme-foot { flex: 0 0 auto; padding: 16px 20px; border-top: 1px solid var(--border-default); background: var(--neutral-primary-soft); }
+
+/* 色票輸入:小色塊(對齊 .b-input 高度、圓角、邊框) */
+.b-color { display: block; width: 100%; height: var(--field-height, 40px); margin: 0; padding: 4px; border: 1px solid var(--border-default-medium); border-radius: var(--radius-md); background: var(--neutral-primary-soft); cursor: pointer; box-shadow: var(--shadow-xs); }
+.b-color::-webkit-color-swatch-wrapper { padding: 0; }
+.b-color::-webkit-color-swatch { border: none; border-radius: 4px; }
+.b-color::-moz-color-swatch { border: none; border-radius: 4px; }
+.b-color:hover { border-color: var(--border-default-strong); }
+.b-color:focus-visible { outline: none; border-color: var(--border-brand); box-shadow: 0 0 0 1px var(--brand); }
+
+/* 右欄:真前台 iframe 即時預覽 — 預覽區填滿卡片高度、小 padding */
+.b-theme-preview-card > .b-card-body { display: flex; flex-direction: column; padding: 6px; }
+/* 外層容器負責捲動(iframe 本身不可操作) */
+.b-theme-preview { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: #f6f7f2; }
+/* iframe:pointer-events:none → 完全不可點/不可 hover;給大高度讓整頁內容展開,交給外層 .b-theme-preview 捲動 */
+.b-theme-frame { display: block; width: 100%; height: 1400px; border: 0; pointer-events: none; background: #f6f7f2; }
+.b-theme-preview-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--fg-brand-strong); background: var(--brand-softer); border: 1px solid var(--border-brand-subtle); border-radius: var(--radius-full); padding: 3px 10px; }
+.b-theme-preview-tag :where(i, .lucide, svg) { width: 13px; height: 13px; }
+
+/* ════════════════════════════════════════════════════════════════════
+   操作手冊(manual):固定高(is-fixed-h is-manual-fixed)——
+   左 = 固定收邊框 + 框內捲(對齊排程設定 tab 模式),右 = 頁內導覽固定(scrollspy,manual.js)。
+   桌機 only。
+   ════════════════════════════════════════════════════════════════════ */
+.main-content.is-manual-fixed > .b-manual { flex: 1 1 auto; min-height: 0; }
+.b-manual { display: grid; grid-template-columns: minmax(0, 1fr) 148px; gap: 24px; align-items: stretch; }
+
+/* 左框:邊框/圓角/shadow 永遠完整,捲動移到內層;框吃淡灰底讓白卡浮出(同排程 tab) */
+.b-manual-frame {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  background: var(--neutral-tertiary);
+  overflow: hidden;
+}
+.b-manual-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* 框內卡片:貼滿框寬(去左右圓角/邊框/自帶陰影),卡間 12px 細縫透出框底灰 */
+.b-manual-scroll > .b-card { border-left: 0; border-right: 0; border-radius: 0; box-shadow: none; margin: 0; }
+.b-manual-scroll > .b-card + .b-card { margin-top: 12px; }
+.b-manual-scroll > .b-card:first-child { border-top: 0; }
+.b-manual-scroll > .b-card:last-child { border-bottom: 0; }
+
+/* 錨點捲動:框內對位,不需 header 偏移 */
+.b-manual-sec { scroll-margin-top: 0; }
+
+/* 步驟列表:編號圓 + 內文;粗體強調用 heading 色。行寬設上限,長行才好讀 */
+.b-manual-steps { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; max-width: 880px; font-size: 14px; line-height: 1.7; color: var(--text-body); }
+.b-manual-steps li { display: flex; gap: 10px; }
+.b-manual-steps b { color: var(--text-heading); font-weight: 600; }
+.b-manual-step-n { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-top: 2px; border-radius: var(--radius-full); background: var(--neutral-tertiary); color: var(--text-heading); font-size: 12px; font-weight: 600; }
+
+/* 截圖:乾淨外框 + 下方小字說明(無裝飾)。
+   排版 = 步驟在上、截圖在下(單張限寬、兩張自動並排),避免左字右圖高低不均。 */
+.b-manual-shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; max-width: 1200px; }
+.b-shot { margin: 0; max-width: 760px; min-width: 0; }
+.b-shot img { display: block; width: 100%; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.b-shot figcaption { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--text-body-subtle); }
+
+/* 頁內導覽:固定直欄(頁面本身不捲,左框內捲),左 2px 導軌;active = 品牌色軌 + 品牌色字 */
+.b-manual-toc { align-self: start; padding-top: 2px; }
+.b-manual-toc-title { margin-bottom: 6px; padding-left: 13px; font-size: 12px; font-weight: 600; color: var(--text-body-subtle); }
+.b-manual-toc a { display: block; padding: 6px 0 6px 12px; border-left: 2px solid var(--border-default); font-size: 13px; line-height: 1.5; color: var(--text-body-subtle); text-decoration: none; transition: color .15s, border-color .15s; }
+.b-manual-toc a:hover { color: var(--text-heading); }
+.b-manual-toc a:focus-visible { outline: 2px solid var(--border-brand); outline-offset: -2px; border-radius: var(--radius-sm); }
+.b-manual-toc a.active { border-left-color: var(--fg-brand); color: var(--fg-brand); font-weight: 500; }
+
+/* ════════════════════════════════════════════════════════════════════
+   navbar 小工具:字級調整 + 深淺色切換(操作手冊左邊,細分隔線隔開)
+   ════════════════════════════════════════════════════════════════════ */
+/* ⚠️ 不用 font:inherit(會蓋掉 .header-icon-btn 的 16px 而讓 icon 縮小、對不齊隔壁鈕)。
+   17px = 光學補償:AA/月亮是開放形glyph,同字級下看起來比圓形的 ?/外連小一號。 */
+.header-right button.header-icon-btn { border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 17px; }
+.header-right .header-sep { width: 1px; height: 18px; background: var(--border-default); margin: 0 2px; flex: none; }
+
+/* ── 字級三段(中 −1px / 大=預設 / 特大 +2px):html[data-fs] 由 navbar 滑桿控制、存 localStorage。
+      範圍=整個後台(2026-07-02 使用者要求含側欄/nav):
+      1) 根字級 15/16/18px → 側欄選單、logo、page-title 等 rem/繼承文字整包縮放(Tailwind rem utility 同步);
+      2) --b-fs-boost → 內容區寫死 px 的 .b-* 元件(下方那組覆寫);
+      3) chrome 內 px 例外(右上帳號名)個別補。 ── */
+:root[data-fs="sm"] { font-size: 15px; --b-fs-boost: -1px; --field-font-size: 13px; }
+:root[data-fs="lg"] { font-size: 18px; --b-fs-boost: 2px; --field-font-size: 16px; }
+[data-fs] .header-right .header-user-btn .header-user-name { font-size: calc(14px + var(--b-fs-boost)); }
+/* 側欄項目/收合浮窗:b_admin.css 寫死 14px(不吃根字級)→ 用 boost 覆寫 */
+[data-fs] .sidebar .menu-item,
+[data-fs] .sidebar .submenu-toggle,
+[data-fs] .cms-flyout-item { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-tbl { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-tbl thead th { font-size: calc(13px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-btn:not(.b-btn-xs):not(.b-btn-lg) { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-label { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-card-title { font-size: calc(16px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-kpi-label { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-empty-sub { font-size: calc(14px + var(--b-fs-boost)); }
+[data-fs] .main-content .b-manual-steps { font-size: calc(14px + var(--b-fs-boost)); }
+
+/* ── 深色模式 brand 家族:light 版的 color-mix 全往 #fff 調(淡底、深字),深色下會變成
+      「深字消失在深底 / 淡底塊刺眼」。這裡改用 oklch 相對色:從 --b-chrome 取「色相」,
+      拉高亮度與彩度 → 深底上清楚的綠,而非 color-mix(+#fff) 的灰化沙綠。仍不寫死第二套色。 ── */
+:root[data-color-mode="dark"] {
+  --brand: oklch(from var(--b-chrome) 0.52 calc(c * 1.5) h);          /* 主要按鈕底:中亮綠 */
+  --b-on-primary: #ffffff;
+  --brand-strong: oklch(from var(--b-chrome) 0.58 calc(c * 1.5) h);   /* hover:深色慣例 = 亮一階 */
+  --brand-medium: oklch(from var(--b-chrome) 0.42 calc(c * 1.3) h);
+  --brand-soft: oklch(from var(--b-chrome) 0.33 calc(c * 1.1) h);
+  --brand-softer: oklch(from var(--b-chrome) 0.27 c h);               /* 側欄 active pill:深綠暗底 */
+  --fg-brand: oklch(from var(--b-chrome) 0.82 calc(c * 1.6) h);       /* 亮綠字:深底上清楚 */
+  --fg-brand-strong: oklch(from var(--b-chrome) 0.9 calc(c * 1.3) h);
+  --border-brand: oklch(from var(--b-chrome) 0.64 calc(c * 1.5) h);
+  --border-brand-subtle: oklch(from var(--b-chrome) 0.4 calc(c * 1.1) h);
+}
+
+/* ── 深色 retrofit:內頁殘留的裸 Tailwind 亮色 utility(時段格子/圖例等)對映到 token。
+      特異度 (0,3,0) > utility (0,1,0),不用 !important。新頁請直接用 token,別再添裸色。 ── */
+[data-color-mode="dark"] .main-content .bg-white { background-color: var(--neutral-primary-soft); }
+[data-color-mode="dark"] .main-content .bg-gray-50 { background-color: var(--neutral-secondary-soft); }
+[data-color-mode="dark"] .main-content .bg-gray-100 { background-color: var(--neutral-tertiary); }
+[data-color-mode="dark"] .main-content .bg-gray-200 { background-color: var(--neutral-quaternary); }
+[data-color-mode="dark"] .main-content :is(.bg-green-50, .bg-emerald-50) { background-color: var(--success-soft); }
+[data-color-mode="dark"] .main-content :is(.bg-red-50, .bg-red-100, .bg-rose-50) { background-color: var(--danger-soft); }
+[data-color-mode="dark"] .main-content :is(.bg-amber-50, .bg-amber-100, .bg-yellow-100) { background-color: var(--warning-soft); }
+[data-color-mode="dark"] .main-content :is(.text-gray-400, .text-gray-500) { color: var(--text-body-subtle); }
+[data-color-mode="dark"] .main-content :is(.text-gray-600, .text-gray-700) { color: var(--text-body); }
+[data-color-mode="dark"] .main-content :is(.text-gray-800, .text-gray-900) { color: var(--text-heading); }
+
+/* ── 深淺切換柔和過場 ──
+      .b-mode-anim 暫掛在 <html> 500ms,期間全元素色彩屬性開 transition(!important 暫時蓋過各自的)。 */
+html.b-mode-anim, html.b-mode-anim *, html.b-mode-anim *::before, html.b-mode-anim *::after {
+  transition: background .35s ease, background-color .35s ease, color .35s ease,
+              border-color .35s ease, fill .35s ease, stroke .35s ease,
+              box-shadow .35s ease, font-size .3s ease !important;
+}
+
+/* ── 深淺色切換鈕:月亮/太陽都先渲染、class 切換顯示(不能 v-if 換 lucide 節點,會弄壞 Vue) ── */
+.header-mode-btn .mode-ic { display: inline-flex; align-items: center; justify-content: center; }
+.header-mode-btn .mode-ic-sun { display: none; }
+.header-mode-btn.is-dark .mode-ic-moon { display: none; }
+.header-mode-btn.is-dark .mode-ic-sun { display: inline-flex; }
+
+/* ── 字級三段滑桿浮出面板 ── */
+.header-fs-wrap { position: relative; display: inline-flex; }
+.header-fs-panel {
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 1300; width: 200px;   /* 往右展開(使用者要求;left:0 貼齊 AA 鈕左緣) */
+  padding: 12px 14px; background: var(--neutral-primary-soft);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.header-fs-title { margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--text-body-subtle); }
+.header-fs-range { display: block; width: 100%; margin: 0; accent-color: var(--brand); cursor: pointer; }
+.header-fs-marks { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-body-subtle); }
+.header-fs-marks .on { color: var(--fg-brand); font-weight: 600; }

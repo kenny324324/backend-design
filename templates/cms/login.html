@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-color-mode="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ WEBSITE_TITLE }} - 登入</title>
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('bAdminColorMode') === 'dark') {
+                    document.documentElement.setAttribute('data-color-mode', 'dark');
+                }
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_tokens.css') }}?v=20260702a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_admin.css') }}?v=20260709b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/login.css') }}?v=20260709e">
+    <style>
+        :root { --b-primary: #173226; --b-chrome: #173226; --b-on-primary: #ffffff; }
+    </style>
+</head>
+<body class="login-body">
+    <div id="app" class="login-page is-admin" data-default-store-id="{{ stores[0].id if stores else '' }}">
+        <main class="login-shell" aria-label="登入表單">
+            <section class="login-panel" aria-label="登入表單">
+                <div class="login-panel-head">
+                    <div class="login-card-brand">
+                        <h1 class="login-brand-title">{{ WEBSITE_TITLE }}</h1>
+                        <p class="login-brand-sub">模擬器預約後台</p>
+                    </div>
+                </div>
+
+                <form class="login-form" @submit.prevent="handleSubmit" novalidate>
+                    <div v-show="showStoreField" class="form-group">
+                        <label class="form-label" for="login-store">
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            所屬機關
+                        </label>
+                        <select id="login-store"
+                                v-model="formData.store_id"
+                                :class="['form-input', errors.store_id ? 'error' : '']">
+                            <option value="">請選擇機關</option>
+                            {% for store in stores %}
+                            <option value="{{ store.id }}">{{ store.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <p v-if="errors.store_id" class="form-error">[[ errors.store_id ]]</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-email">
+                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                            電子郵件
+                        </label>
+                        <input id="login-email"
+                               type="email"
+                               v-model="formData.email"
+                               autocomplete="username"
+                               placeholder="you@example.com"
+                               :class="['form-input', errors.email ? 'error' : '']">
+                        <p v-if="errors.email" class="form-error">[[ errors.email ]]</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-password">
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            密碼
+                        </label>
+                        <div class="password-wrapper">
+                            <input id="login-password"
+                                   :type="showPassword ? 'text' : 'password'"
+                                   v-model="formData.password"
+                                   autocomplete="current-password"
+                                   placeholder="請輸入密碼"
+                                   :class="['form-input', errors.password ? 'error' : '']"
+                                   style="padding-right: 44px;">
+                            <button type="button"
+                                    @click="showPassword = !showPassword"
+                                    :aria-pressed="showPassword.toString()"
+                                    :aria-label="showPassword ? '隱藏密碼' : '顯示密碼'"
+                                    class="password-toggle">
+                                <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p v-if="errors.password" class="form-error">[[ errors.password ]]</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-captcha">
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            驗證碼
+                        </label>
+                        <div class="captcha-wrapper">
+                            <input id="login-captcha"
+                                   type="text"
+                                   v-model="formData.captcha"
+                                   autocomplete="off"
+                                   inputmode="text"
+                                   placeholder="輸入 5 位數字"
+                                   maxlength="5"
+                                   :class="['form-input captcha-input', errors.captcha ? 'error' : '']">
+                            <div class="captcha-img-wrapper">
+                                <img :src="captchaUrl"
+                                     alt="驗證碼圖片"
+                                     class="captcha-img"
+                                     @click="refreshCaptcha"
+                                     title="重新產生驗證碼">
+                                <button type="button"
+                                        @click="refreshCaptcha"
+                                        aria-label="重新產生驗證碼"
+                                        class="captcha-refresh"
+                                        title="重新產生驗證碼">
+                                    <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <p v-if="errors.captcha" class="form-error">[[ errors.captcha ]]</p>
+                    </div>
+
+                    <div v-if="errorMessage" class="error-alert" role="alert" aria-live="assertive">
+                        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                        <span>[[ errorMessage ]]</span>
+                    </div>
+
+                    <button type="submit"
+                            :disabled="isSubmitting"
+                            class="btn-login">
+                        <i v-if="isSubmitting" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                        <span>[[ isSubmitting ? '登入中...' : '登入' ]]</span>
+                    </button>
+                </form>
+
+            </section>
+        </main>
+
+        <p class="login-copyright">&copy; 2026 {{ WEBSITE_TITLE }}</p>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const BASE_URL = '{{ APPLICATION_ROOT if APPLICATION_ROOT != "/" else "" }}';
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        if (window.axios) {
+            axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
+            axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/pages/cms/login.js') }}"></script>
+</body>
+</html>

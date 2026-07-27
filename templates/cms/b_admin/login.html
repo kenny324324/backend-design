@@ -1,0 +1,138 @@
+{# [JustGolf B] 每球場後台登入(/cms/<course_code>/login) #}
+<!DOCTYPE html>
+<html lang="zh-Hant" data-color-mode="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>後台登入 - {{ g.course.name }}</title>
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('bAdminColorMode') === 'dark') {
+                    document.documentElement.setAttribute('data-color-mode', 'dark');
+                }
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_tokens.css') }}?v=20260702a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/b_admin.css') }}?v=20260709b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cms/login.css') }}?v=20260709e">
+    <style>
+        :root {
+            --b-primary: {{ g.theme.get('primary_color') or '#173226' }};
+            --b-chrome: {{ g.theme.get('primary_color') or '#173226' }};
+            --b-on-primary: {{ g.theme.get('on_primary') or '#ffffff' }};
+        }
+    </style>
+</head>
+<body class="login-body">
+    <div class="login-page is-course">
+        <main class="login-shell" aria-label="{{ g.course.name }} 後台登入">
+            <section class="login-panel" aria-label="登入表單">
+                <div class="login-panel-head">
+                    <div class="login-card-brand">
+                        <div class="login-mark" aria-hidden="{{ 'false' if g.theme.get('logo_url') else 'true' }}">
+                        {% if g.theme.get('logo_url') %}
+                        <img src="{{ g.theme.get('logo_url') }}" alt="{{ g.course.name }} 標誌">
+                        {% else %}
+                        <i data-lucide="flag" aria-hidden="true"></i>
+                        {% endif %}
+                        </div>
+                        <h1 class="login-brand-title">{{ g.course.name }}</h1>
+                        <p class="login-brand-sub">球場預約後台</p>
+                    </div>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                <div class="login-alert" role="alert">
+                    <i data-lucide="circle-alert" aria-hidden="true"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+                {% endwith %}
+
+                <form method="post" action="{{ url_for('cms_b_admin.login') }}" class="login-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-email">
+                            <i data-lucide="mail" aria-hidden="true"></i>
+                            帳號 Email
+                        </label>
+                        <input id="login-email"
+                               name="email"
+                               type="email"
+                               class="form-input"
+                               placeholder="you@example.com"
+                               required
+                               autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login-password">
+                            <i data-lucide="lock-keyhole" aria-hidden="true"></i>
+                            密碼
+                        </label>
+                        <div class="password-wrapper">
+                            <input id="login-password"
+                                   name="password"
+                                   type="password"
+                                   class="form-input"
+                                   placeholder="請輸入密碼"
+                                   required
+                                   autocomplete="current-password"
+                                   style="padding-right: 44px;">
+                            <button type="button"
+                                    class="login-password-toggle"
+                                    data-password-toggle="login-password"
+                                    aria-label="顯示密碼"
+                                    aria-pressed="false">
+                                <i data-lucide="eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-login">
+                        <i data-lucide="log-in" aria-hidden="true"></i>
+                        <span>登入</span>
+                    </button>
+                </form>
+
+            </section>
+        </main>
+
+        <p class="login-copyright">&copy; 2026 {{ g.course.name }}</p>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        function refreshLoginIcons() {
+            if (window.lucide) {
+                window.lucide.createIcons({
+                    attrs: {
+                        'stroke-width': 2.2,
+                        'aria-hidden': 'true'
+                    }
+                });
+            }
+        }
+
+        document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+            var input = document.getElementById(button.getAttribute('data-password-toggle'));
+            if (!input) return;
+            button.addEventListener('click', function () {
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                button.setAttribute('aria-pressed', show ? 'true' : 'false');
+                button.setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼');
+                button.innerHTML = '<i data-lucide="' + (show ? 'eye-off' : 'eye') + '" aria-hidden="true"></i>';
+                refreshLoginIcons();
+            });
+        });
+
+        refreshLoginIcons();
+    </script>
+</body>
+</html>
