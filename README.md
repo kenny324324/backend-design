@@ -104,7 +104,13 @@ backend-design/
 ### 導覽 / Nav 架構(整套在 base.html + b_admin.css/base.css)
 - 結構:固定 `top-header`(logo/字級/深淺色/手冊/前台/帳號下拉)+ 左側 `sidebar`(選單)+ `main-content`。
 - **選單資料來自 API**:`GET /cms/<code>/usermenu`(B)/ A 版同構,回 `{ success, menu: [{ id, title, url, sub: [{ id, title, url }] }] }` — 靜態專案給一份同形狀的 JSON 即可(demo/預覽就是走 `window.__B_PREVIEW_MENU` 注入)。
-- 行為(Vue 殼層已實作):手風琴 **single-open**;`sidebarCollapsed` 收合軌(存 localStorage)— 收合時點群組改開 `.cms-flyout` 浮窗(transition 動畫);active 判斷 `isCurrentMenuItem` / `isGroupActive`;連結由 `menuHref(url)` 組(前綴集中一處,新專案改這個 method 就好);儀表板獨立置頂、登出住右上帳號下拉(側欄不重複放)。
+- 行為(Vue 殼層已實作):手風琴 **single-open**;active 判斷 `isCurrentMenuItem` / `isGroupActive`;連結由 `menuHref(url)` 組(前綴集中一處,新專案改這個 method 就好);儀表板獨立置頂、登出住右上帳號下拉(側欄不重複放)。
+- **可伸縮側邊欄(收合軌)** — 完整實作都在:
+  - 側欄左下 `.sidebar-toggle` 按鈕切換 `sidebarCollapsed`(**存 localStorage**,重整/換頁記住);展開⇄收合有寬度過渡,收合後只剩 icon 軌、`.menu-text` 隱藏。
+  - **收合時點有子選單的群組 → 不展開手風琴,改在旁邊開 `.cms-flyout` 浮窗**(JS 算 top/left 定位、`<transition name="flyout">` 展開動畫,浮窗內含群組標題 + 子項、active 同步)。
+  - ⚠️ 收合軌的選單項要用 `flex-start` 對齊(b_admin.css 已寫)— 否則文字子節點會把 icon 推出去被裁掉。
+  - ⚠️ flyout / 帳號下拉的「點外面關閉」要 `@click.stop`:lucide 重繪會把點到的 svg 換成新節點,冒泡到 document 時 `closest()` 回 null → 面板剛開就被誤關(base.html 註解有記)。
+  - 窄視窗另有 `sidebarOpen` 抽屜模式(漢堡鈕開、`.sidebar-overlay` 遮罩點擊關)。
 - 樣式:active = brand 色淡底 pill + brand 色字、hover 只變文字色;`.menu-caret` 旋轉;`.submenu` 高度過渡。全部吃 token → 跟著 brand.css 換色。
 
 ### 登入頁
