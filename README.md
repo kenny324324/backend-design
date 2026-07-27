@@ -120,6 +120,18 @@ backend-design/
 ### 登入頁
 - `templates/cms/b_admin/login.html`(B,吃球場主色)/ `templates/cms/login.html`(A)+ `static/css/login.css`。置中卡片、`.b-input`/`.b-btn` 元件、brand token 配色 — 換專案只要 brand.css 換色,登入頁自動跟。
 
+## ★ SPA 頁面轉場(spa.js — 換頁不閃、側欄選中平滑切換)
+
+外殼(header/側邊欄)**永不重建**,換頁只抽換 `#main-content`:攔截後台內部連結 → fetch 整頁 → DOMParser 抽出新的 `#main-content` 塞回 → `history.pushState` 同步 URL。route 完全不用改(後端仍回整頁,前端自己抽)。
+
+- **轉場動畫**:換好內容後加 `is-spa-entered` → 播 `b-spa-fade-in` 淡入(animationend 自動移除);**載入態延遲 180ms** 才變灰(`is-spa-loading`)— fetch 快就完全不閃,真的慢才給回饋。
+- **側欄 active 同步**:`syncActive()` 只更新 Vue 的 `currentPath/currentPage`(`isCurrentMenuItem` 吃這兩個值)→ active pill 平滑跳到新頁,**手風琴開合/收合狀態全保留**。
+- **頁面 JS 生命週期**:各頁註冊 `window.pageInit.<頁名> = (root) => { …; return cleanupFn }`;換頁時先跑上一頁 cleanup(停相機、銷毀 DataTables/TinyMCE)再 init 新頁。頁名 = path 尾段。
+- **頁面專屬 CSS 同步**:base.html 的 `{% block extra_css %}` 外包 `<!-- b-spa-extra-css-start/end -->` 註解標記,spa.js 換頁時把標記區間的 style/link 一併換掉。
+- **換頁後重增強**:`reEnhance()` 自動跑 `renderLucideIcons` + `BDropdown.init` + `BRequireFill.refreshAll`。
+- **接管規則**(`shouldHandle`):只接同源、後台前綴內的左鍵點擊;`target=_blank`/`download`/修飾鍵/`data-no-spa` 屬性都放行原生;同 path 僅 query 變(篩選)讓 `filter.js` 只換表格區,popstate 用 capture + `stopImmediatePropagation` 分工不互踩。任何失敗(網路錯/抽換失敗/被重導登入頁)→ **降級成整頁導航**,永不白屏。
+- **兩版差異**:B 版 `js/b/spa.js`(單 Vue app);A 版 `js/cms/spa.js`(雙層 app:殼層常駐、`<main v-pre>`、頁面 app 由 pageInit 註冊表 mount,**pushState 先於 applyMain**)。⚠️ A 版 **spa.js 必須先於 dropdown.js 載入**,否則 Vue 把增強殼當模板複製 → 死下拉。
+
 ## ★ 內滾機制(固定高頁面,整頁不捲、只捲內容區)
 
 列表/表格頁的核心版型:**外層不滾,捲動只發生在內容框內、thead 釘住**。CSS 全在 `b_admin.css`。
