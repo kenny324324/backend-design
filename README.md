@@ -83,6 +83,58 @@ backend-design/
 - **桌機 only**:這套後台不做手機版(內部工具)。
 - 版本戳習慣:引用時帶 `?v=YYYYMMDDx` query(改檔後遞增,避免瀏覽器快取吃舊檔)。
 
+## ★ 內滾機制(固定高頁面,整頁不捲、只捲內容區)
+
+列表/表格頁的核心版型:**外層不滾,捲動只發生在內容框內、thead 釘住**。CSS 全在 `b_admin.css`。
+
+```html
+{# 1) 內頁開啟固定高(opt-in) #}
+{% block main_modifier %}is-fixed-h{% endblock %}
+
+{# 2) 內滾框「必須是 .main-content 的直接子項」(不能埋在巢狀 div;modal 留在後面當 sibling) #}
+<main class="main-content is-fixed-h">
+  <div class="page-header">…</div>          <!-- 固定區:不縮 -->
+  <div class="b-tbl-scroll">                <!-- 唯一吃剩餘高的子項:內滾 + thead sticky -->
+    <table class="b-tbl">…</table>
+  </div>
+</main>
+```
+
+運作原理:
+- `.main-content.is-fixed-h` = `height: calc(100vh - var(--header-height))` + flex column + `overflow: hidden`(外層不滾)。
+- `.is-fixed-h > :not(.b-tbl-scroll) { flex: 0 0 auto }` — page-header / 篩選列等固定區不被壓縮;只有 `.b-tbl-scroll` 吃剩餘高。
+- `.b-tbl-scroll` = `flex: 0 1 auto; min-height: 0; overflow: auto` — **可縮不可長**:資料少 → 框貼合內容高(不留空白);資料多 → 被 flex 收縮觸發內滾、thead sticky 釘住;寬表同框橫向捲。
+- 表格包在 `<form>` 裡要一起送出時:form 加 `.is-fixed-h-form`(form 變伸展 flex 欄,表格內滾、儲存鈕固定)。
+- 自訂雙欄/非表格版面要內滾:自己的容器需**高特異度**壓過 `>:not(.b-tbl-scroll){flex:0 0 auto}`(寫成 `.main-content.is-fixed-h > .你的容器 { flex:1 1 auto; min-height:0 }`),欄內再 `min-height:0 + overflow-y:auto`。⚠️ 欄容器**不可 `overflow:hidden`**(會裁掉 `.b-pop-panel` 篩選下拉)。
+- 頁面特化變體(同模型):`is-billing-fixed`、`is-slots-fixed`(tab 頁只有當前 panel 吃高)、`is-checkin-fixed`。
+- 搭 DataTables =「**列表頁三件套**」:`is-fixed-h` + `.b-tbl-scroll` + `dom:'rt'`(去原生 chrome)+ 頁首 `.a-search`。⚠️ serverSide **不可 `paging:false`**(後端 FETCH 吃到 -1 會炸),用 `pageLength: 200`。**⚠️ 不要用 DataTables `scrollY`** — 它自拆 scrollHead/scrollBody 另一套 DOM,跟 is-fixed-h 高度鏈打架、欄寬會歪;內滾一律交給 `.b-tbl-scroll`。
+- 捲動漸層淡出(選配):容器加 `.is-scroll-faded`(`scroll-fade.js` 自動掃 + MutationObserver;`window.ScrollFade.scan`)。
+
+## ★ Modal 架構
+
+### 顯示機制與動畫
+- 基本三態:`.b-modal-overlay`(預設 `display:none`)→ 加 `is-visible`(display:flex)→ **下一 frame** 加 `is-open`(opacity 0→1 淡入);關閉反向(先拔 `is-open` 等過場再拔 `is-visible`)。
+- Vue 頁面版:包 `<transition name="b-modal-fade">` + overlay 加 `data-modal-anim="vue"`(告訴外殼觀察器別搶動畫;`v-show` 開關,關閉等 leave 結束)。⚠️ 用 `v-show` 不用 `v-if` — 外殼 MutationObserver 監聽的是 style 變化,v-if 建新節點不會被 observe(下拉不會自動增強);且 v-if 會摧毀 TinyMCE 這類編輯器。
+- z-index 層級:header 1000 → 下拉/`.b-pop` 1200 → modal 1300 → **疊加 modal**(modal 上再開圖庫/確認)1400。
+
+### 變體
+| class | 用途 |
+|---|---|
+| `.b-modal` | 基本(max-width 520) |
+| `.is-soft` | 標準表單 modal(圓潤 24px、白底欄位) |
+| `.is-wide` | 寬扁(640,配桌機螢幕,body 兩欄 grid) |
+| `.is-wizard` | 分段輸入:**固定高** `min(660px, calc(100vh - 32px))` + flex column、body flex:1 內滾當保險;搭膠囊 stepper `.b-steps` + `.b-steps-track`/`.b-steps-fill`(progressPct 滑動進度) |
+| `.is-alert` | 小確認框(340、無頭尾分隔線;`.b-alert-body/.b-alert-title/.b-alert-desc/.b-alert-foot`,頂部 `.b-alert-icon(-danger/-warn)` 純色 icon) |
+| 大編輯 modal | **固定高 modal + body grid 單列 `minmax(0,1fr)`** 左右兩欄徹底等高(等高**不要**靠 `align-items:stretch` 內容驅動 — 內容高度不可控會對不齊);內部各欄 `flex:1; min-height:0; overflow-y:auto` 內滾 |
+
+### 行為規範(全後台一致)
+- **有 ✕ 就不放「取消」鈕**;送出鈕用 `.b-btn.b-btn-text`(純文字),modal 內次要動作也走文字鈕。
+- **必填未填 → 送出鈕 disable**:Vue 頁用 computed(如 `formIncomplete`)綁 `:disabled`;非 Vue 頁用 `data-require-fill`(外殼共用 JS)。⚠️ 兩者**不可混用**(data-require-fill 會跟 Vue 的 `:disabled` 打架)。
+- **有輸入才跳「放棄編輯」確認**:開啟時 `_formSnapshot = JSON.stringify(formData)`,✕/遮罩點擊走 `requestClose` → dirty(JSON 比對;含編輯器 `isDirty()`、已上傳附件、勾選清單)才開 `.b-modal.is-alert` 確認,否則直接關;送出成功直接關不問。
+- **modal 內的 `<select>`**:動態出現(v-if/換步驟)的內容 BDropdown 掃不到 → 開啟/切步的 `$nextTick` 呼叫 `window.BDropdown.init(modalEl)`(`data-bdd` 防重)+ 程式改值後 `BDropdown.syncAll(modalEl)`。
+- **modal body 要內滾**時加 `.is-scroll-faded` 取得捲動漸層(header/footer 保持固定,別讓標題跟內容一起捲)。
+- SPA/雙層 Vue app 環境 **`$refs` 取不到** — modal 內定位節點一律 `document.querySelector('.js-xxx')`,file input、video 同理。
+
 ## 依賴(全 CDN,無 build step)
 
 Tailwind CDN(runtime config)· Vue 3(僅外殼/部分頁面)· lucide(icon)· axios(外殼 CSRF 附掛)· Inter 字體(系統 fallback 亦可)。元件 CSS 本身**零外部資產**(無圖片/字型引用)。
