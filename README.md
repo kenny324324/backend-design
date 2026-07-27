@@ -5,6 +5,8 @@
 
 **先看效果**:直接用瀏覽器開 [`demo/demo.html`](demo/demo.html)(免 server),所有元件 + 動畫 + 深色模式一頁看完。
 
+**用 AI 套用/查漏**:把 [`AI-GUIDE.md`](AI-GUIDE.md) 給 AI — 第一部分是套用規則(鐵則/接入/範本對照/坑),第二部分是**已套用專案的複檢程序**(全域 + 逐頁 10 項檢查 + 修復流程)。
+
 ---
 
 ## 內容物
@@ -81,6 +83,10 @@ backend-design/
 3. `<html>` 加 `data-color-mode="light"`(切 `dark` 即深色;token 兩值都已備齊)。字級三段:`data-fs="sm|lg"`(不設 = 中)。
 4. 外殼(header/sidebar/flyout/toast)直接抄 `templates/cms/b_admin/base.html`(B 版,單 Vue app)或 `templates/cms/base.html`(A 版,雙層 app + SPA),需要 Vue 3 + lucide(CDN)。只用元件不用外殼的話,Vue/lucide 都可不裝(icon 換成任何 SVG 皆可)。
 5. 頁面照 `templates/` 對應頁當範本抄(內頁 `{% block main_modifier %}` / `page_title` / `page_actions` 的用法都在裡面),資料邏輯換成自己專案的。
+
+## 接入後「有些樣式沒套到」?→ 跑診斷
+
+開你的專案出問題的頁面 → F12 Console → 把 [`demo/diagnose.js`](demo/diagnose.js) 整檔貼上執行,會逐項檢查最常見的漏接原因並給修法:五支 CSS 是否齊/順序對、token 與 `--b-chrome` 是否解析、Tailwind config 片段是否內聯、**`.main-content` 容器是否存在**(retrofit 補丁層的作用域,最常見的「部分沒套到」原因)、select 被 dropdown.css 藏住、lucide 未渲染、快取版本戳。
 
 ## 慣例與注意
 
